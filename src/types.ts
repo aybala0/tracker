@@ -1,9 +1,7 @@
 export type Tier = "Income" | "Purchase" | "Investment";
 
-export type SplitOption = "I paid all" | "50 / 50" | "They paid";
-
 export type Transaction = {
-  id: number;
+  id: string;
   date: string;
   desc: string;
   amt: number;
@@ -14,6 +12,7 @@ export type Transaction = {
 };
 
 export type DrillItem = {
+  id: string;
   desc: string;
   tag: string;
   amt: number;

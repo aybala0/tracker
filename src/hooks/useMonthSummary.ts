@@ -1,14 +1,34 @@
-// TODO(backend): compute this month's spend vs. the day-of-month average from
-// real transaction data instead of returning a fixed mock snapshot.
+import { useEffect, useState } from "react";
+
+type MonthSummary = {
+  thisMonth: number;
+  average: number;
+  percentBelow: number;
+  dayOfMonth: number;
+  /** % width, from the left, of the filled portion of the comparison bar. */
+  fillPct: number;
+  /** % from the left where the "avg" marker line sits. */
+  avgLinePct: number;
+};
+
+const EMPTY: MonthSummary = {
+  thisMonth: 0,
+  average: 0,
+  percentBelow: 0,
+  dayOfMonth: 0,
+  fillPct: 0,
+  avgLinePct: 0,
+};
+
 export function useMonthSummary() {
-  return {
-    thisMonth: 3450,
-    average: 3921,
-    percentBelow: 12,
-    dayOfMonth: 27,
-    /** % width, from the left, of the filled portion of the comparison bar. */
-    fillPct: 77.6,
-    /** % from the left where the "avg" marker line sits. */
-    avgLinePct: 88,
-  };
+  const [data, setData] = useState<MonthSummary>(EMPTY);
+
+  useEffect(() => {
+    fetch("/api/summary/month")
+      .then((res) => res.json())
+      .then((d) => setData(d))
+      .catch(() => {});
+  }, []);
+
+  return data;
 }

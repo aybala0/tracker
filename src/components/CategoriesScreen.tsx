@@ -13,12 +13,11 @@ export function CategoriesScreen() {
   const [month, setMonth] = useState(MONTH_OPTIONS[0]);
   const [sel, setSel] = useState("Groceries");
   const totals = useCategoryTotals(month);
-  const { drill, relabel } = useDrillTransactions();
+  const { items, relabel } = useDrillTransactions(sel, month);
 
   const { out, total } = slices(totals, 96, 110, 110, sel, true);
   const selSlice = out.find((x) => x.name === sel) ?? out[0];
   const headColor = selSlice ? selSlice.color : "#000";
-  const items = drill[sel] || [];
 
   return (
     <div className="flex-1 overflow-y-auto px-[22px] pb-[26px] pt-[18px]">
@@ -73,12 +72,12 @@ export function CategoriesScreen() {
 
       {items.map((d) => (
         <DrillRow
-          key={d.desc}
+          key={d.id}
           item={d}
           tagBg={headColor}
           tagFg={fg(headColor)}
           currentCategory={sel}
-          onRelabel={(toCategory) => relabel(sel, d.desc, toCategory)}
+          onRelabel={(toCategory) => relabel(d.id, toCategory, d.shared)}
         />
       ))}
     </div>
