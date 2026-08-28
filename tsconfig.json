@@ -17,5 +17,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src", "api", "lib", "vite.config.ts"]
+  "include": ["src", "api", "lib", "db", "vite.config.ts"]
 }
