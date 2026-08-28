@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import type { SplitOption, Tier, Transaction } from "../types";
+import type { Tier, Transaction } from "../types";
 import { CATS, CAT_COLOR, SUBS } from "../constants/categories";
 import { fg } from "../utils/color";
-import { money } from "../utils/format";
+import { moneySigned } from "../utils/format";
 import { CategoryChip } from "./CategoryChip";
 import { OtherCategorySheet } from "./OtherCategorySheet";
 
@@ -11,21 +11,21 @@ type Props = {
   open: boolean;
   onToggle: () => void;
   onCategorize: (cat: string, sub: string | null) => void;
+  onShare: (cat: string, sub: string | null, description: string) => void;
 };
 
 const TIERS: Tier[] = ["Income", "Purchase", "Investment"];
-const SPLIT_OPTS: SplitOption[] = ["I paid all", "50 / 50", "They paid"];
 
 function plainChip(active: boolean) {
   return active ? { bg: "#000", fg: "#fff" } : { bg: "#fff", fg: "#000" };
 }
 
-export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
+export function InboxRow({ tx, open, onToggle, onCategorize, onShare }: Props) {
   const [tier, setTier] = useState<Tier | null>(null);
   const [cat, setCat] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
   const [hayat, setHayat] = useState(false);
-  const [split, setSplit] = useState<SplitOption | null>(null);
+  const [hayatDesc, setHayatDesc] = useState("");
   const [otherOpen, setOtherOpen] = useState(false);
 
   // Seed/reset local labeling state whenever the row opens or closes,
@@ -36,7 +36,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
       setCat(tx.rule ? tx.cat ?? null : null);
       setSub(tx.rule ? tx.sub ?? null : null);
       setHayat(false);
-      setSplit(null);
+      setHayatDesc("");
       setOtherOpen(false);
     }
   }, [open, tx.rule, tx.cat, tx.sub]);
@@ -49,9 +49,9 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
   const showSubs = !!cat && cat !== "Other";
   const showShared = !!cat;
   const catColor = cat ? CAT_COLOR[cat] : "#fff";
-  const hayatLabel = sub || cat || "";
 
   const finish = () => onCategorize(cat!, sub);
+  const finishShared = () => onShare(cat!, sub, hayatDesc);
 
   return (
     <div className="relative" style={{ borderTop: "2px solid #000", padding: "14px 0" }}>
@@ -76,7 +76,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
         </div>
         <div className="flex-none text-right">
           <div style={{ font: "800 19px Archivo", fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em" }}>
-            {money(tx.amt)}
+            {moneySigned(tx.amt)}
           </div>
           <button
             type="button"
@@ -194,36 +194,9 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
                     >
                       Hayat
                     </span>
-                    <span style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.55)" }}>writes one row to the shared sheet</span>
-                  </div>
-                  <div className="mb-[11px] flex gap-2.5">
-                    <div className="flex-1">
-                      <div
-                        className="mb-1 uppercase"
-                        style={{ font: "400 9.5px 'Space Mono', monospace", letterSpacing: ".14em", color: "rgba(0,0,0,.62)" }}
-                      >
-                        Amount
-                      </div>
-                      <input
-                        defaultValue={tx.amt.toFixed(2)}
-                        className="w-full"
-                        style={{ height: 42, border: "1.5px solid rgba(0,0,0,.3)", background: "#fff", padding: "0 10px", font: "700 14px Archivo", fontVariantNumeric: "tabular-nums" }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div
-                        className="mb-1 uppercase"
-                        style={{ font: "400 9.5px 'Space Mono', monospace", letterSpacing: ".14em", color: "rgba(0,0,0,.62)" }}
-                      >
-                        Label
-                      </div>
-                      <input
-                        readOnly
-                        value={hayatLabel}
-                        className="w-full"
-                        style={{ height: 42, border: "1.5px solid rgba(0,0,0,.3)", background: catColor as string, color: fg(catColor as string), padding: "0 10px", font: "700 14px Archivo" }}
-                      />
-                    </div>
+                    <span style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.55)" }}>
+                      writes one row to the shared sheet, 50/50
+                    </span>
                   </div>
                   <div
                     className="mb-1 uppercase"
@@ -232,35 +205,18 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
                     Description (short)
                   </div>
                   <input
+                    autoFocus
+                    value={hayatDesc}
+                    onChange={(e) => setHayatDesc(e.target.value)}
                     placeholder="e.g. TJ run"
                     className="mb-3.5 w-full"
                     style={{ height: 42, border: "1.5px solid rgba(0,0,0,.3)", background: "#fff", padding: "0 10px", font: "500 14px Archivo" }}
                   />
-                  <div
-                    className="mb-1.5 uppercase"
-                    style={{ font: "400 9.5px 'Space Mono', monospace", letterSpacing: ".14em", color: "rgba(0,0,0,.62)" }}
-                  >
-                    Who is owed
-                  </div>
-                  <div className="mb-3.5 flex" style={{ border: "2px solid #000" }}>
-                    {SPLIT_OPTS.map((o, i) => {
-                      const chip = plainChip(split === o);
-                      return (
-                        <div
-                          key={o}
-                          onClick={() => setSplit(o)}
-                          className="grid flex-1 cursor-pointer place-items-center uppercase"
-                          style={{ minHeight: 44, background: chip.bg, color: chip.fg, borderLeft: i ? "2px solid #000" : "none", font: "800 11.5px Archivo", letterSpacing: ".04em" }}
-                        >
-                          {o}
-                        </div>
-                      );
-                    })}
-                  </div>
                   <button
                     type="button"
-                    onClick={finish}
-                    className="grid w-full place-items-center uppercase"
+                    onClick={finishShared}
+                    disabled={!hayatDesc.trim()}
+                    className="grid w-full place-items-center uppercase disabled:opacity-40"
                     style={{ height: 48, background: "#000", color: "#fff", font: "800 13px Archivo", letterSpacing: ".1em" }}
                   >
                     Log &amp; file
@@ -268,24 +224,21 @@ export function InboxRow({ tx, open, onToggle, onCategorize }: Props) {
                 </div>
               ) : (
                 <div className="flex items-center gap-2.5">
-                  <div className="flex-1" style={{ font: "700 13px Archivo" }}>
-                    Shared expense?
-                  </div>
+                  <button
+                    type="button"
+                    onClick={finish}
+                    className="grid flex-1 place-items-center uppercase"
+                    style={{ height: 46, background: "#000", color: "#fff", font: "800 12px Archivo", letterSpacing: ".06em" }}
+                  >
+                    Done
+                  </button>
                   <button
                     type="button"
                     onClick={() => setHayat(true)}
                     className="grid place-items-center uppercase"
-                    style={{ height: 42, padding: "0 14px", border: "2px solid #000", background: "#17BEBB", font: "800 11.5px Archivo", letterSpacing: ".06em" }}
+                    style={{ height: 46, padding: "0 16px", border: "2px solid #000", background: "#17BEBB", font: "800 12px Archivo", letterSpacing: ".06em" }}
                   >
-                    Yes, split
-                  </button>
-                  <button
-                    type="button"
-                    onClick={finish}
-                    className="grid place-items-center uppercase"
-                    style={{ height: 42, padding: "0 14px", background: "#000", color: "#fff", font: "800 11.5px Archivo", letterSpacing: ".06em" }}
-                  >
-                    Just me
+                    Shared?
                   </button>
                 </div>
               )}

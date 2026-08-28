@@ -4,11 +4,12 @@ import { InboxRow } from "./InboxRow";
 
 type Props = {
   inbox: Transaction[];
-  onCategorize: (id: number, cat: string, sub: string | null) => void;
+  onCategorize: (id: string, cat: string, sub: string | null) => void;
+  onShare: (id: string, cat: string, sub: string | null, description: string) => void;
 };
 
-export function InboxScreen({ inbox, onCategorize }: Props) {
-  const [openId, setOpenId] = useState<number | null>(null);
+export function InboxScreen({ inbox, onCategorize, onShare }: Props) {
+  const [openId, setOpenId] = useState<string | null>(null);
   const oldest = inbox[inbox.length - 1];
 
   return (
@@ -31,6 +32,10 @@ export function InboxScreen({ inbox, onCategorize }: Props) {
             onToggle={() => setOpenId(openId === t.id ? null : t.id)}
             onCategorize={(cat, sub) => {
               onCategorize(t.id, cat, sub);
+              setOpenId(null);
+            }}
+            onShare={(cat, sub, description) => {
+              onShare(t.id, cat, sub, description);
               setOpenId(null);
             }}
           />

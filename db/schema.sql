@@ -74,3 +74,17 @@ create index if not exists transactions_date_idx on transactions(date);
 create index if not exists transactions_category_id_idx on transactions(category_id);
 -- Uncategorized inbox is the hot query: tier is null until the user labels it.
 create index if not exists transactions_uncategorized_idx on transactions(date) where tier is null;
+
+-- Hayat integration: rows can now originate from the shared expense sheet
+-- instead of Plaid (synthetic transactions for expenses Erdem paid, or
+-- expenses Aybala paid in cash/before Plaid's sync window).
+alter table transactions add column if not exists source text not null default 'plaid' check (source in ('plaid', 'hayat'));
+-- Aybala's specific share of a shared expense — what should count toward her
+-- spending totals. Only meaningful when is_shared is true.
+alter table transactions add column if not exists shared_amount numeric(12, 2);
+-- Hayat-sourced rows have no real Plaid account behind them.
+alter table transactions alter column account_id drop not null;
+alter table transactions alter column plaid_item_id drop not null;
+alter table transactions drop constraint if exists transactions_source_requires_account;
+alter table transactions add constraint transactions_source_requires_account
+  check (source = 'hayat' or (account_id is not null and plaid_item_id is not null));

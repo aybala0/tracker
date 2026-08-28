@@ -1,4 +1,14 @@
-// TODO(backend): fetch real account balances (e.g. via Plaid) instead.
+import { useEffect, useState } from "react";
+
 export function useNetWorth() {
-  return { net: 6755.72, checking: 8742.16, cards: -1986.44 };
+  const [data, setData] = useState({ net: 0, checking: 0, cards: 0 });
+
+  useEffect(() => {
+    fetch("/api/summary/net-worth")
+      .then((res) => res.json())
+      .then((d) => setData(d))
+      .catch(() => {});
+  }, []);
+
+  return data;
 }

@@ -1,54 +1,48 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DrillItem } from "../types";
 
-// TODO(backend): replace with a fetch of transactions for the selected
-// category/month, keyed the same way.
-const MOCK_DRILL: Record<string, DrillItem[]> = {
-  Groceries: [
-    { desc: "TRADER JOE S #706 CHICAGO IL", tag: "Trader Joe's", amt: 47.43, date: "6 Aug", shared: true },
-    { desc: "MARIANO'S #8517 CHICAGO IL", tag: "Groceries", amt: 88.12, date: "11 Aug", shared: true },
-    { desc: "WHOLEFDS HYP #10145", tag: "Groceries", amt: 61.4, date: "18 Aug", shared: false },
-    { desc: "H MART CHICAGO IL", tag: "Groceries", amt: 52.77, date: "22 Aug", shared: true },
-  ],
-  "Rent & Bills": [
-    { desc: "ZELLE PAYMENT TO GRANVILLE MGMT", tag: "Rent", amt: 1620.0, date: "1 Aug", shared: true },
-    { desc: "COMED BILL PAYMENT 800-334-7661", tag: "Electric", amt: 74.31, date: "9 Aug", shared: true },
-    { desc: "XFINITY MOBILE 855-4-XFINITY", tag: "Internet", amt: 70.0, date: "12 Aug", shared: false },
-    { desc: "PEOPLES GAS BILL PAY", tag: "Rent & Bills", amt: 41.2, date: "14 Aug", shared: true },
-  ],
-  "Food & Drinks": [
-    { desc: "GRUBHUB - U OF IL - CHICA", tag: "Delivery", amt: 13.28, date: "6 Aug", shared: false },
-    { desc: "SP HOXTON BAKERY CHICAGO", tag: "Coffee", amt: 7.15, date: "7 Aug", shared: false },
-    { desc: "KASAMA CHICAGO IL", tag: "Dinner out", amt: 96.4, date: "16 Aug", shared: true },
-  ],
-  Shopping: [
-    { desc: "Uniqlo USA LLC New York NY", tag: "Clothing", amt: 114.88, date: "6 Aug", shared: false },
-    { desc: "Amazon.com*YI9JY44W3", tag: "Amazon", amt: 19.83, date: "5 Aug", shared: false },
-    { desc: "MUJI 555 N MICHIGAN", tag: "Shopping", amt: 38.4, date: "19 Aug", shared: false },
-  ],
-};
+/** Converts a "August 2026" style month string to "YYYY-MM". */
+function toYearMonth(month: string): string {
+  const [monthName, year] = month.split(" ");
+  const idx = new Date(`${monthName} 1, ${year}`).getMonth(); // 0-indexed
+  return `${year}-${String(idx + 1).padStart(2, "0")}`;
+}
 
 /**
- * Owns the per-category drill-down transaction lists and lets a transaction
- * be relabeled (moved) to a different category.
+ * Owns the drill-down transaction list for a single category+month and lets
+ * a transaction be relabeled (moved) to a different category.
  */
-export function useDrillTransactions() {
-  const [drill, setDrill] = useState<Record<string, DrillItem[]>>(MOCK_DRILL);
+export function useDrillTransactions(category: string, month: string) {
+  const [items, setItems] = useState<DrillItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const relabel = useCallback((fromCategory: string, desc: string, toCategory: string) => {
-    if (fromCategory === toCategory) return;
-    setDrill((prev) => {
-      const items = prev[fromCategory] || [];
-      const item = items.find((d) => d.desc === desc);
-      if (!item) return prev;
-      const relabeled: DrillItem = { ...item, tag: toCategory };
-      return {
-        ...prev,
-        [fromCategory]: items.filter((d) => d.desc !== desc),
-        [toCategory]: [...(prev[toCategory] || []), relabeled],
-      };
-    });
-  }, []);
+  useEffect(() => {
+    setLoading(true);
+    const ym = toYearMonth(month);
+    fetch(`/api/summary/drill?month=${ym}&category=${encodeURIComponent(category)}`)
+      .then((res) => res.json())
+      .then((data: DrillItem[]) => setItems(data))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [category, month]);
 
-  return { drill, relabel };
+  // Note: the item's own `id` is needed to relabel the right row, so this
+  // takes (id, toCategory) rather than toCategory alone — the call site
+  // (DrillRow via CategoriesScreen) closes over the item to supply `id`.
+  const relabel = useCallback(
+    (id: string, toCategory: string, shared: boolean) => {
+      if (toCategory === category) return;
+      setItems((prev) => prev.filter((d) => d.id !== id));
+      fetch(`/api/transactions/${id}/categorize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cat: toCategory, sub: null, isShared: shared }),
+      }).catch(() => {
+        // Optimistic removal stays even on failure — no rollback UI for this pass.
+      });
+    },
+    [category]
+  );
+
+  return { items, relabel, loading };
 }
