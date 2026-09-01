@@ -3,10 +3,12 @@ import { usePlaidLink } from "react-plaid-link";
 
 type Props = {
   onConnected: () => void;
+  /** Text shown once the button is ready to click — lets callers say "Add bank" instead of "Connect bank" when one's already linked. */
+  idleLabel?: string;
 };
 
 /** Fetches a Plaid Link token, opens Plaid Link, and exchanges the resulting public token on success. */
-export function ConnectBank({ onConnected }: Props) {
+export function ConnectBank({ onConnected, idleLabel = "Connect bank" }: Props) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "connecting" | "error">("loading");
 
@@ -53,7 +55,7 @@ export function ConnectBank({ onConnected }: Props) {
     status === "loading" ? "Loading…" :
     status === "connecting" ? "Connecting…" :
     status === "error" ? "Try again" :
-    "Connect bank";
+    idleLabel;
 
   return (
     <button
