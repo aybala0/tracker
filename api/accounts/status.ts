@@ -13,7 +13,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const [syncRow] = await db<{ last_synced_at: string | null }>`
       select max(last_synced_at) as last_synced_at from plaid_items
     `;
-    return res.status(200).json({ linked: !!row, lastSyncedAt: syncRow?.last_synced_at ?? null });
+    const institutions = await db<{ institution_name: string | null }>`
+      select distinct institution_name from plaid_items order by institution_name
+    `;
+    return res.status(200).json({
+      linked: !!row,
+      lastSyncedAt: syncRow?.last_synced_at ?? null,
+      institutions: institutions.map((i) => i.institution_name).filter((n): n is string => !!n),
+    });
   } catch (err) {
     console.error("accounts status error:", err);
     return res.status(500).json({ error: "Failed to fetch account status." });
