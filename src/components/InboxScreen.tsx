@@ -12,6 +12,7 @@ type Props = {
 export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const oldest = inbox[inbox.length - 1];
+  const ruleMatchedCount = inbox.filter((t) => t.rule).length;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -52,9 +53,11 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
         ) : (
           <>
             <div style={{ height: 2, background: "#000" }} />
-            <div className="mt-4" style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.5)" }}>
-              Rules matched 3 of these before you woke up.
-            </div>
+            {ruleMatchedCount > 0 && (
+              <div className="mt-4" style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.5)" }}>
+                Rules matched {ruleMatchedCount} of these before you woke up.
+              </div>
+            )}
           </>
         )}
       </div>

@@ -119,3 +119,11 @@ alter table regex_rules add column if not exists subcategory_id uuid references 
 alter table transactions drop column if exists category_id;
 alter table regex_rules drop column if exists category_id;
 drop table if exists categories;
+
+-- 'transfer' = an internal movement (e.g. a credit card payment appearing on
+-- both the credit account and the checking account it was paid from) —
+-- excluded from spend totals and the inbox the same way income/investment
+-- are, but assigned programmatically, never chosen through the UI.
+alter table transactions drop constraint if exists transactions_tier_check;
+alter table transactions add constraint transactions_tier_check
+  check (tier in ('income', 'purchase', 'investment', 'transfer'));

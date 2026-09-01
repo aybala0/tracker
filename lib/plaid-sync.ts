@@ -1,6 +1,6 @@
 import { plaidClient } from "./plaid.js";
 import { db } from "./db.js";
-import { matchRegexRule, findPriorCategorization } from "./categorize.js";
+import { matchRegexRule, findPriorCategorization, matchCardPaymentTransfers } from "./categorize.js";
 
 export type PlaidSyncSummary = {
   added: number;
@@ -80,6 +80,11 @@ export async function syncAllPlaidItems(): Promise<PlaidSyncSummary> {
 
     await db`update plaid_items set cursor = ${cursor}, last_synced_at = now() where id = ${item.id}`;
   }
+
+  // Re-scan (not just this batch) since a card payment's two sides can land
+  // in different sync runs — one account's data may arrive a day after the
+  // other's.
+  await matchCardPaymentTransfers();
 
   return { added, modified, removed };
 }
