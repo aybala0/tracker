@@ -1,6 +1,6 @@
 import { plaidClient } from "./plaid.js";
 import { db } from "./db.js";
-import { matchRegexRule } from "./categorize.js";
+import { matchRegexRule, findPriorCategorization } from "./categorize.js";
 
 export type PlaidSyncSummary = {
   added: number;
@@ -39,16 +39,24 @@ export async function syncAllPlaidItems(): Promise<PlaidSyncSummary> {
         `;
         if (!account) continue; // account not yet synced via exchange — skip until it is
 
-        const match = await matchRegexRule(t.name ?? t.merchant_name ?? "");
+        const description = t.name ?? t.merchant_name ?? "";
+        const match = await matchRegexRule(description);
+        // If this exact description has been categorized before, apply the
+        // same labeling now — the transaction skips the inbox entirely.
+        // Only affects a fresh insert (see the `on conflict` below): an
+        // already-existing transaction never gets its category clobbered
+        // by a later sync.
+        const prior = await findPriorCategorization(description);
 
         await db`
           insert into transactions (
             plaid_transaction_id, plaid_item_id, account_id, date, description,
-            amount, matched_rule_id, raw
+            amount, matched_rule_id, raw, tier, category_slug, subcategory_id
           )
           values (
-            ${t.transaction_id}, ${item.id}, ${account.id}, ${t.date}, ${t.name ?? ""},
-            ${t.amount}, ${match?.ruleId ?? null}, ${JSON.stringify(t)}
+            ${t.transaction_id}, ${item.id}, ${account.id}, ${t.date}, ${description},
+            ${t.amount}, ${match?.ruleId ?? null}, ${JSON.stringify(t)},
+            ${prior?.tier ?? null}, ${prior?.categorySlug ?? null}, ${prior?.subcategoryId ?? null}
           )
           on conflict (plaid_transaction_id) do update set
             amount = excluded.amount,
