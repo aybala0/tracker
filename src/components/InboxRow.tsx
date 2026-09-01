@@ -30,25 +30,31 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const [hayatDesc, setHayatDesc] = useState("");
   const [otherOpen, setOtherOpen] = useState(false);
   const [subOptions, setSubOptions] = useState<string[]>([]);
+  const [addingSub, setAddingSub] = useState(false);
+  const [newSubName, setNewSubName] = useState("");
 
-  // Seed/reset local labeling state whenever the row opens or closes,
-  // mirroring the design: a rule-matched transaction opens pre-filled.
+  // Reset local labeling state whenever the row opens or closes. Purchase is
+  // the default tier — it's the overwhelmingly common case for a bank feed.
   useEffect(() => {
     if (open) {
-      setTier(tx.rule ? "Purchase" : null);
-      setCat(tx.rule ? tx.cat ?? null : null);
-      setSub(tx.rule ? tx.sub ?? null : null);
+      setTier("Purchase");
+      setCat(null);
+      setSub(null);
       setHayat(false);
       setHayatDesc("");
       setOtherOpen(false);
+      setAddingSub(false);
+      setNewSubName("");
     }
-  }, [open, tx.rule, tx.cat, tx.sub]);
+  }, [open]);
 
   // Real subcategory suggestions for the selected major, fetched from the
   // API's live data instead of the old SUBS mock. GET /api/categories
   // returns every major with its subcategories already loaded; filter down
   // to the one the user picked.
   useEffect(() => {
+    setAddingSub(false);
+    setNewSubName("");
     if (!cat || cat === "Other") {
       setSubOptions([]);
       return;
@@ -93,15 +99,6 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             {tx.date}
           </div>
           <div style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em" }}>{tx.desc}</div>
-          {tx.rule && (
-            <div
-              className="mt-[7px] inline-flex items-center gap-1.5"
-              style={{ background: "#F2DC5D", padding: "3px 7px", font: "600 11px Archivo" }}
-            >
-              <i className="ph-bold ph-lightning" style={{ fontSize: 12 }} />
-              {tx.rule}
-            </div>
-          )}
         </div>
         <div className="flex-none text-right">
           <div style={{ font: "800 19px Archivo", fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em" }}>
@@ -213,14 +210,71 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                     </div>
                   );
                 })}
-                <div
-                  className="flex cursor-pointer items-center gap-1.5"
-                  style={{ minHeight: 34, padding: "0 11px", border: "1.5px dashed rgba(0,0,0,.35)", font: "500 13px Archivo", color: "rgba(0,0,0,.6)" }}
-                >
-                  <i className="ph-bold ph-plus" style={{ fontSize: 12 }} />
-                  New
-                </div>
+                {!addingSub && (
+                  <div
+                    onClick={() => setAddingSub(true)}
+                    className="flex cursor-pointer items-center gap-1.5"
+                    style={{ minHeight: 34, padding: "0 11px", border: "1.5px dashed rgba(0,0,0,.35)", font: "500 13px Archivo", color: "rgba(0,0,0,.6)" }}
+                  >
+                    <i className="ph-bold ph-plus" style={{ fontSize: 12 }} />
+                    New
+                  </div>
+                )}
               </div>
+
+              {addingSub && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const name = newSubName.trim();
+                        if (!name) return;
+                        setSubOptions((prev) => (prev.includes(name) ? prev : [...prev, name]));
+                        setSub(name);
+                        setAddingSub(false);
+                        setNewSubName("");
+                      } else if (e.key === "Escape") {
+                        setAddingSub(false);
+                        setNewSubName("");
+                      }
+                    }}
+                    placeholder="New subcategory name"
+                    className="flex-1"
+                    style={{ height: 34, border: "1.5px solid #000", padding: "0 10px", font: "500 13px Archivo" }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!newSubName.trim()}
+                    onClick={() => {
+                      const name = newSubName.trim();
+                      if (!name) return;
+                      setSubOptions((prev) => (prev.includes(name) ? prev : [...prev, name]));
+                      setSub(name);
+                      setAddingSub(false);
+                      setNewSubName("");
+                    }}
+                    className="grid place-items-center uppercase disabled:opacity-40"
+                    style={{ height: 34, padding: "0 12px", background: "#000", color: "#fff", font: "800 11px Archivo", letterSpacing: ".06em" }}
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingSub(false);
+                      setNewSubName("");
+                    }}
+                    className="grid place-items-center uppercase"
+                    style={{ height: 34, padding: "0 10px", border: "1.5px solid rgba(0,0,0,.3)", font: "800 11px Archivo", letterSpacing: ".06em", color: "rgba(0,0,0,.6)" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
