@@ -14,7 +14,7 @@ import { AnalysisScreen } from "./components/AnalysisScreen";
 export default function App() {
   const { authenticated, login } = useAuth();
   const [tab, setTab] = useState<NavTarget>("Home");
-  const { linked, refresh } = useBankStatus();
+  const { linked, lastSyncedAt, refresh } = useBankStatus();
   const { inbox, categorize, share, categorizeTier } = useTransactions();
 
   if (authenticated === null) {
@@ -31,7 +31,7 @@ export default function App() {
           <ConnectBank onConnected={refresh} idleLabel={linked ? "Add bank" : "Connect bank"} />
         </div>
       )}
-      {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} />}
+      {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} lastSyncedAt={lastSyncedAt} />}
       {tab === "Inbox" && (
         <InboxScreen inbox={inbox} onCategorize={categorize} onShare={share} onFinishTier={categorizeTier} />
       )}

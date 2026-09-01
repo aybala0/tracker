@@ -1,4 +1,4 @@
-import { CAT_COLOR } from "../constants/categories";
+import { colorForCategory } from "./category-color";
 
 export type Slice = {
   name: string;
@@ -43,7 +43,7 @@ export function slices(
       name: k,
       amount: data[k],
       frac,
-      color: CAT_COLOR[k] || "#111",
+      color: colorForCategory(k),
       sw: sel === k ? 4 : 2,
       d: `M ${cx} ${cy} L ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`,
       tf: `translate(${(off * Math.cos(mid)).toFixed(2)} ${(off * Math.sin(mid)).toFixed(2)})`,

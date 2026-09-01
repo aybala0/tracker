@@ -1,4 +1,4 @@
-import { CAT_COLOR } from "../constants/categories";
+import { colorForCategory } from "../utils/category-color";
 import { fg } from "../utils/color";
 
 type Props = {
@@ -10,7 +10,7 @@ type Props = {
 
 /** A category chip: locked to the category's fixed color when selected, matching the pie slice / drill-down tag for that category everywhere. */
 export function CategoryChip({ name, active, onClick, size = "md" }: Props) {
-  const color = CAT_COLOR[name] ?? "#111";
+  const color = colorForCategory(name);
   const bg = active ? color : "#fff";
   const textColor = active ? fg(color) : "#2d2b2b";
   const dot = active ? textColor : color;

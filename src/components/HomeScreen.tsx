@@ -9,6 +9,7 @@ import type { NavTarget } from "../types";
 type Props = {
   inboxCount: number;
   onNavigate: (tab: NavTarget) => void;
+  lastSyncedAt: string | null;
 };
 
 function fmtSigned(n: number): string {
@@ -16,10 +17,25 @@ function fmtSigned(n: number): string {
   return n < 0 ? `−$${abs}` : `$${abs}`;
 }
 
-export function HomeScreen({ inboxCount, onNavigate }: Props) {
+function fmtSyncedAgo(iso: string | null): string {
+  if (!iso) return "Not synced yet";
+  const ms = Date.now() - new Date(iso).getTime();
+  const minutes = Math.max(0, Math.round(ms / 60000));
+  if (minutes < 1) return "Synced just now";
+  if (minutes < 60) return `Synced ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Synced ${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `Synced ${days}d ago`;
+}
+
+const CURRENT_MONTH_LABEL = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+const TODAY_LABEL = new Date().toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+
+export function HomeScreen({ inboxCount, onNavigate, lastSyncedAt }: Props) {
   const { net, checking, cards } = useNetWorth();
-  const { thisMonth, average, percentBelow, fillPct, avgLinePct } = useMonthSummary();
-  const totals = useCategoryTotals("August 2026");
+  const { thisMonth, average, percentBelow, fillPct, avgLinePct, dayOfMonth } = useMonthSummary();
+  const totals = useCategoryTotals(CURRENT_MONTH_LABEL);
   const { out } = slices(totals, 92, 100, 100, null, false);
   const legend = out.slice(0, 5);
 
@@ -27,14 +43,14 @@ export function HomeScreen({ inboxCount, onNavigate }: Props) {
     <div className="flex-1 overflow-y-auto px-[22px] pb-[26px] pt-5">
       <div className="mb-[22px] flex items-center justify-between">
         <div className="uppercase" style={{ font: "700 10px 'Space Mono', monospace", letterSpacing: ".16em" }}>
-          Thu 27 Aug
+          {TODAY_LABEL}
         </div>
         <div
           className="flex items-center gap-1.5 uppercase"
           style={{ font: "700 9.5px 'Space Mono', monospace", letterSpacing: ".14em", color: "#0E7C7B" }}
         >
           <span style={{ width: 7, height: 7, background: "#17BEBB" }} />
-          Synced 6m
+          {fmtSyncedAgo(lastSyncedAt)}
         </div>
       </div>
 
@@ -83,7 +99,7 @@ export function HomeScreen({ inboxCount, onNavigate }: Props) {
           <span style={{ background: "#78C247", padding: "2px 6px" }}>{percentBelow}% below</span>
           <br />
           <span style={{ color: "rgba(0,0,0,.55)", fontWeight: 500 }}>
-            day-27 average of ${average.toLocaleString("en-US")}
+            day-{dayOfMonth} average of ${average.toLocaleString("en-US")}
           </span>
         </div>
       </div>

@@ -70,7 +70,7 @@ export async function syncAllPlaidItems(): Promise<PlaidSyncSummary> {
       hasMore = data.has_more;
     }
 
-    await db`update plaid_items set cursor = ${cursor} where id = ${item.id}`;
+    await db`update plaid_items set cursor = ${cursor}, last_synced_at = now() where id = ${item.id}`;
   }
 
   return { added, modified, removed };

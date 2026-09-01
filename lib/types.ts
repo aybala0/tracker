@@ -1,17 +1,16 @@
 export type Tier = "income" | "purchase" | "investment";
 
-export type Category = {
+export type Subcategory = {
   id: string;
+  parentSlug: string;
   name: string;
-  parentId: string | null;
-  /** Own color if this is a major category, else the parent's color. */
-  color: string;
 };
 
 export type RegexRule = {
   id: string;
   pattern: string;
-  categoryId: string;
+  categorySlug: string | null;
+  subcategoryId: string | null;
   tier: Tier;
   label: string;
 };
@@ -35,7 +34,8 @@ export type Transaction = {
   description: string;
   amount: number;
   tier: Tier | null;
-  categoryId: string | null;
+  categorySlug: string | null;
+  subcategoryId: string | null;
   isShared: boolean;
   hayatLogged: boolean;
   matchedRuleId: string | null;

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { db } from "./db.js";
 import { getRows, updateNotes, type HayatRow } from "./sheets.js";
-import { getCategoryIdByName } from "./categories.js";
+import { resolveMajorSlug } from "./category-defs.js";
 import { stripTagEmoji } from "./hayat-tags.js";
 
 export type HayatSyncSummary = {
@@ -49,8 +49,8 @@ async function markSynced(row: HayatRow): Promise<void> {
  */
 async function createSyntheticTransaction(row: HayatRow): Promise<void> {
   const categoryName = stripTagEmoji(row.tag);
-  const categoryId = await getCategoryIdByName(categoryName);
-  if (!categoryId) {
+  const categorySlug = resolveMajorSlug(categoryName);
+  if (!categorySlug) {
     throw new Error(`Could not resolve category for tag "${row.tag}"`);
   }
 
@@ -58,11 +58,11 @@ async function createSyntheticTransaction(row: HayatRow): Promise<void> {
   await db`
     insert into transactions (
       plaid_transaction_id, plaid_item_id, account_id, date, description,
-      amount, tier, category_id, is_shared, hayat_logged, source, shared_amount, raw
+      amount, tier, category_slug, is_shared, hayat_logged, source, shared_amount, raw
     )
     values (
       ${plaidTransactionId}, null, null, ${row.date}, ${row.description},
-      ${row.amount}, 'purchase', ${categoryId}, true, true, 'hayat', ${row.aylasShare},
+      ${row.amount}, 'purchase', ${categorySlug}, true, true, 'hayat', ${row.aylasShare},
       ${JSON.stringify(row)}
     )
     on conflict (plaid_transaction_id) do nothing
