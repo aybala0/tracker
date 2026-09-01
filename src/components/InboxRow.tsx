@@ -12,6 +12,7 @@ type Props = {
   onToggle: () => void;
   onCategorize: (cat: string, sub: string | null) => void;
   onShare: (cat: string, sub: string | null, description: string) => void;
+  onFinishTier: (tier: Extract<Tier, "Income" | "Investment">) => void;
 };
 
 const TIERS: Tier[] = ["Income", "Purchase", "Investment"];
@@ -20,7 +21,7 @@ function plainChip(active: boolean) {
   return active ? { bg: "#000", fg: "#fff" } : { bg: "#fff", fg: "#000" };
 }
 
-export function InboxRow({ tx, open, onToggle, onCategorize, onShare }: Props) {
+export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTier }: Props) {
   const [tier, setTier] = useState<Tier | null>(null);
   const [cat, setCat] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
@@ -46,12 +47,14 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare }: Props) {
   const btnFg = done ? fg(done) : open ? "#fff" : "#000";
 
   const showCats = tier === "Purchase";
+  const showTierOnly = tier === "Income" || tier === "Investment";
   const showSubs = !!cat && cat !== "Other";
   const showShared = !!cat;
   const catColor = cat ? CAT_COLOR[cat] : "#fff";
 
   const finish = () => onCategorize(cat!, sub);
   const finishShared = () => onShare(cat!, sub, hayatDesc);
+  const finishTierOnly = () => onFinishTier(tier as "Income" | "Investment");
 
   return (
     <div className="relative" style={{ borderTop: "2px solid #000", padding: "14px 0" }}>
@@ -117,6 +120,17 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare }: Props) {
               );
             })}
           </div>
+
+          {showTierOnly && (
+            <button
+              type="button"
+              onClick={finishTierOnly}
+              className="grid w-full place-items-center uppercase"
+              style={{ height: 46, background: "#000", color: "#fff", font: "800 12px Archivo", letterSpacing: ".06em" }}
+            >
+              Done
+            </button>
+          )}
 
           {showCats && (
             <div>

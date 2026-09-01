@@ -1,14 +1,15 @@
 import { useState } from "react";
-import type { Transaction } from "../types";
+import type { Tier, Transaction } from "../types";
 import { InboxRow } from "./InboxRow";
 
 type Props = {
   inbox: Transaction[];
   onCategorize: (id: string, cat: string, sub: string | null) => void;
   onShare: (id: string, cat: string, sub: string | null, description: string) => void;
+  onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">) => void;
 };
 
-export function InboxScreen({ inbox, onCategorize, onShare }: Props) {
+export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const oldest = inbox[inbox.length - 1];
 
@@ -36,6 +37,10 @@ export function InboxScreen({ inbox, onCategorize, onShare }: Props) {
             }}
             onShare={(cat, sub, description) => {
               onShare(t.id, cat, sub, description);
+              setOpenId(null);
+            }}
+            onFinishTier={(tier) => {
+              onFinishTier(t.id, tier);
               setOpenId(null);
             }}
           />
