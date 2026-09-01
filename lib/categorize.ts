@@ -60,19 +60,26 @@ export async function findPriorCategorization(description: string): Promise<Prio
 
 /**
  * Finds and tags credit-card-payment pairs: paying a card from checking
- * produces two real Plaid transactions — one on the credit account
- * ("Payment Thank You...", negative = debt reduced) and one on the checking
- * account ("Payment to [Bank] card ending in ####", positive = money left
- * checking) — for the exact same amount, usually the same day or one day
- * apart. Neither side is real spending, so both get tagged `tier =
- * 'transfer'` (excluded from spend totals and the inbox, same mechanism as
+ * produces two real Plaid transactions — one on the credit account (debt
+ * reduced, negative amount) and one on the checking account (money left,
+ * positive amount). Two distinct real-world payment paths produce different
+ * wording on both sides:
+ *   - Manual (mobile/web) payment: credit side "Payment Thank You...",
+ *     checking side "Payment to [Bank] card ending in ####" — typically
+ *     posts 0-1 days apart.
+ *   - Bank-initiated autopay: credit side often "AUTOMATIC PAYMENT - ..."
+ *     (still contains "payment" + "thank"), checking side "[Bank] CREDIT
+ *     CRD AUTOPAY PPD ID: ..." — settles slower, observed 3 days apart.
+ * Neither side is real spending, so both get tagged `tier = 'transfer'`
+ * (excluded from spend totals and the inbox, same mechanism as
  * income/investment) instead of asking to be categorized.
  *
- * Deliberately conservative: only touches transactions where BOTH sides of
- * a pair are found by description pattern + exact matching amount + a tight
- * date window — a one-sided "Payment Thank You" (e.g. a bank-initiated
- * autopay with no separate checking-side transaction) is left alone rather
- * than guessed at.
+ * The exact-amount match is the one non-negotiable requirement — it's what
+ * makes a pair trustworthy even across loosely-matched description wording
+ * and a several-day date gap. Deliberately conservative beyond that: only
+ * touches transactions where BOTH sides of a pair are actually found; a
+ * one-sided "Payment Thank You" with no real counterpart is left alone
+ * rather than guessed at.
  */
 export async function matchCardPaymentTransfers(): Promise<{ matched: number }> {
   const creditSide = await db<{ id: string; amount: string; date: string }>`
@@ -81,7 +88,7 @@ export async function matchCardPaymentTransfers(): Promise<{ matched: number }> 
     join accounts a on a.id = t.account_id
     where t.tier is null
       and a.type = 'credit'
-      and t.description ~* '^payment thank you'
+      and t.description ~* 'payment' and t.description ~* 'thank'
   `;
 
   let matched = 0;
@@ -92,9 +99,9 @@ export async function matchCardPaymentTransfers(): Promise<{ matched: number }> 
       join accounts a on a.id = t.account_id
       where t.tier is null
         and a.type = 'depository'
-        and t.description ~* '^payment to .* card ending in'
+        and (t.description ~* 'card ending in' or t.description ~* 'autopay')
         and t.amount = ${Math.abs(Number(credit.amount))}
-        and abs(t.date - ${credit.date}::date) <= 2
+        and abs(t.date - ${credit.date}::date) <= 5
       limit 1
     `;
     if (!checking) continue; // no confirmed counterpart — leave both alone
