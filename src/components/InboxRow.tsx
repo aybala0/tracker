@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Tier, Transaction } from "../types";
-import { CATS, CAT_COLOR, SUBS } from "../constants/categories";
+import { CATS } from "../constants/categories";
+import { colorForCategory, colorForSubcategory } from "../utils/category-color";
 import { fg } from "../utils/color";
 import { moneySigned } from "../utils/format";
 import { CategoryChip } from "./CategoryChip";
@@ -28,6 +29,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const [hayat, setHayat] = useState(false);
   const [hayatDesc, setHayatDesc] = useState("");
   const [otherOpen, setOtherOpen] = useState(false);
+  const [subOptions, setSubOptions] = useState<string[]>([]);
 
   // Seed/reset local labeling state whenever the row opens or closes,
   // mirroring the design: a rule-matched transaction opens pre-filled.
@@ -42,7 +44,32 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
     }
   }, [open, tx.rule, tx.cat, tx.sub]);
 
-  const done = open && cat ? CAT_COLOR[cat] : null;
+  // Real subcategory suggestions for the selected major, fetched from the
+  // API's live data instead of the old SUBS mock. GET /api/categories
+  // returns every major with its subcategories already loaded; filter down
+  // to the one the user picked.
+  useEffect(() => {
+    if (!cat || cat === "Other") {
+      setSubOptions([]);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((majors: { name: string; subcategories: { id: string; name: string }[] }[]) => {
+        if (cancelled) return;
+        const match = majors.find((m) => m.name === cat);
+        setSubOptions(match ? match.subcategories.map((s) => s.name) : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSubOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cat]);
+
+  const done = open && cat ? colorForCategory(cat) : null;
   const btnBg = done || (open ? "#000" : "#fff");
   const btnFg = done ? fg(done) : open ? "#fff" : "#000";
 
@@ -50,7 +77,6 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const showTierOnly = tier === "Income" || tier === "Investment";
   const showSubs = !!cat && cat !== "Other";
   const showShared = !!cat;
-  const catColor = cat ? CAT_COLOR[cat] : "#fff";
 
   const finish = () => onCategorize(cat!, sub);
   const finishShared = () => onShare(cat!, sub, hayatDesc);
@@ -166,8 +192,9 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                 Subcategory of {cat} — optional
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {(SUBS[cat!] || []).map((n) => {
+                {subOptions.map((n, i) => {
                   const active = sub === n;
+                  const subColor = colorForSubcategory(cat!, i);
                   return (
                     <div
                       key={n}
@@ -177,8 +204,8 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                         minHeight: 34,
                         padding: "0 11px",
                         border: `1.5px solid ${active ? "#000" : "rgba(0,0,0,.22)"}`,
-                        background: active ? (catColor as string) : "transparent",
-                        color: active ? fg(catColor as string) : "#2d2b2b",
+                        background: active ? subColor : "transparent",
+                        color: active ? fg(subColor) : "#2d2b2b",
                         font: "500 13px Archivo",
                       }}
                     >

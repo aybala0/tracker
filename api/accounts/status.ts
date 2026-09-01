@@ -10,7 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const [row] = await db<{ id: string }>`select id from accounts limit 1`;
-    return res.status(200).json({ linked: !!row });
+    const [syncRow] = await db<{ last_synced_at: string | null }>`
+      select max(last_synced_at) as last_synced_at from plaid_items
+    `;
+    return res.status(200).json({ linked: !!row, lastSyncedAt: syncRow?.last_synced_at ?? null });
   } catch (err) {
     console.error("accounts status error:", err);
     return res.status(500).json({ error: "Failed to fetch account status." });

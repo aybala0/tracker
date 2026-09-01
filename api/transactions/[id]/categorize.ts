@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { db } from "../../../lib/db.js";
 import { requireAuth } from "../../../lib/auth.js";
-import { getCategoryIdByName, findOrCreateSubcategoryId } from "../../../lib/categories.js";
+import { findOrCreateSubcategoryId } from "../../../lib/categories.js";
+import { resolveMajorSlug } from "../../../lib/category-defs.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -37,26 +38,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (tier !== "purchase") {
       await db`
         update transactions
-        set tier = ${tier}, category_id = null, is_shared = false, updated_at = now()
+        set tier = ${tier}, category_slug = null, subcategory_id = null, is_shared = false, updated_at = now()
         where id = ${id}
       `;
       return res.status(200).json({ ok: true });
     }
 
-    const majorId = await getCategoryIdByName(cat!);
-    if (!majorId) {
+    const majorSlug = resolveMajorSlug(cat!);
+    if (!majorSlug) {
       return res.status(400).json({ error: `Unknown category: ${cat}` });
     }
 
-    let categoryId = majorId;
-    if (sub) {
-      const subId = await findOrCreateSubcategoryId(cat!, sub);
-      if (subId) categoryId = subId;
-    }
+    const subcategoryId = sub ? await findOrCreateSubcategoryId(majorSlug, sub) : null;
 
     await db`
       update transactions
-      set tier = 'purchase', category_id = ${categoryId}, is_shared = ${!!isShared}, updated_at = now()
+      set tier = 'purchase', category_slug = ${majorSlug}, subcategory_id = ${subcategoryId},
+          is_shared = ${!!isShared}, updated_at = now()
       where id = ${id}
     `;
 

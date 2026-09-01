@@ -3,6 +3,7 @@ import { db } from "../../lib/db.js";
 import { requireAuth } from "../../lib/auth.js";
 import { getRows } from "../../lib/sheets.js";
 import { fmtDayMonth } from "../../lib/format-date.js";
+import { getMajorName, resolveMajorSlug } from "../../lib/category-defs.js";
 
 // Consolidated into one dynamic route ([metric].ts handles net-worth,
 // categories, month, drill) to stay under Vercel Hobby's 12-Serverless-
@@ -52,21 +53,22 @@ async function categoriesSummary(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "month is required in YYYY-MM format." });
   }
 
-  const rows = await db<{ name: string; total: string }>`
+  const rows = await db<{ category_slug: string; total: string }>`
     select
-      coalesce(parent.name, cat.name) as name,
+      t.category_slug as category_slug,
       sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
     from transactions t
-    join categories cat on cat.id = t.category_id
-    left join categories parent on cat.parent_id = parent.id
     where t.tier = 'purchase'
+      and t.category_slug is not null
       and to_char(t.date, 'YYYY-MM') = ${month}
-    group by coalesce(parent.name, cat.name)
+    group by t.category_slug
   `;
 
   const result: Record<string, number> = {};
   for (const r of rows) {
-    result[r.name] = Math.abs(Number(r.total));
+    const name = getMajorName(r.category_slug);
+    if (!name) continue; // unknown slug — shouldn't happen, skip defensively
+    result[name] = Math.abs(Number(r.total));
   }
   return res.status(200).json(result);
 }
@@ -77,31 +79,38 @@ async function drill(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "month (YYYY-MM) and category are required." });
   }
 
+  const categorySlug = resolveMajorSlug(category);
+  if (!categorySlug) {
+    return res.status(400).json({ error: `Unknown category: ${category}` });
+  }
+
   const rows = await db<{
     id: string;
     description: string;
     amount: string;
     date: string;
     is_shared: boolean;
-    tag_name: string;
+    category_slug: string;
+    subcategory_id: string | null;
+    sub_name: string | null;
   }>`
     select
       t.id, t.description,
       case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end as amount,
-      to_char(t.date, 'YYYY-MM-DD') as date, t.is_shared, cat.name as tag_name
+      to_char(t.date, 'YYYY-MM-DD') as date, t.is_shared, t.category_slug, t.subcategory_id,
+      sub.name as sub_name
     from transactions t
-    join categories cat on cat.id = t.category_id
-    left join categories parent on cat.parent_id = parent.id
+    left join subcategories sub on sub.id = t.subcategory_id
     where t.tier = 'purchase'
       and to_char(t.date, 'YYYY-MM') = ${month}
-      and (cat.name = ${category} or parent.name = ${category})
+      and t.category_slug = ${categorySlug}
     order by t.date asc
   `;
 
   const result = rows.map((r) => ({
     id: r.id,
     desc: r.description,
-    tag: r.tag_name,
+    tag: r.sub_name ?? getMajorName(r.category_slug) ?? r.category_slug,
     amt: Math.abs(Number(r.amount)),
     date: fmtDayMonth(r.date),
     shared: r.is_shared,

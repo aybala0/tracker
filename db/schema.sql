@@ -12,6 +12,8 @@ create table if not exists plaid_items (
 -- Separate ALTER (not inline on the CREATE above) so this file stays safe to
 -- re-run against a database that already has the table.
 alter table plaid_items add column if not exists cursor text;
+-- Drives the Home screen's real "Synced Xm ago" indicator.
+alter table plaid_items add column if not exists last_synced_at timestamptz;
 
 create table if not exists accounts (
   id uuid primary key default gen_random_uuid(),
@@ -71,7 +73,13 @@ create table if not exists transactions (
   updated_at timestamptz not null default now()
 );
 create index if not exists transactions_date_idx on transactions(date);
-create index if not exists transactions_category_id_idx on transactions(category_id);
+-- transactions_category_id_idx (on the now-retired category_id column) is
+-- deliberately not created here anymore: category_id is dropped later in
+-- this same file, and re-running this file against a database where that
+-- drop already happened would fail trying to index a nonexistent column
+-- (transactions already exists at that point, so `create table if not
+-- exists` above is a no-op and doesn't recreate category_id). Postgres
+-- drops the index automatically along with the column on a fresh apply.
 -- Uncategorized inbox is the hot query: tier is null until the user labels it.
 create index if not exists transactions_uncategorized_idx on transactions(date) where tier is null;
 
@@ -88,3 +96,26 @@ alter table transactions alter column plaid_item_id drop not null;
 alter table transactions drop constraint if exists transactions_source_requires_account;
 alter table transactions add constraint transactions_source_requires_account
   check (source = 'hayat' or (account_id is not null and plaid_item_id is not null));
+
+-- Categories are now: majors live in code (src/constants/categories.ts,
+-- lib/category-defs.ts), only subcategories are database rows.
+create table if not exists subcategories (
+  id uuid primary key default gen_random_uuid(),
+  parent_slug text not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (parent_slug, name)
+);
+
+alter table transactions add column if not exists category_slug text;
+alter table transactions add column if not exists subcategory_id uuid references subcategories(id);
+
+alter table regex_rules add column if not exists category_slug text;
+alter table regex_rules add column if not exists subcategory_id uuid references subcategories(id);
+
+-- One-time data migration (db/migrate-categories.ts) moved every transaction
+-- and regex_rule off the old categories table onto category_slug/
+-- subcategory_id above before these final statements were run for real.
+alter table transactions drop column if exists category_id;
+alter table regex_rules drop column if exists category_id;
+drop table if exists categories;

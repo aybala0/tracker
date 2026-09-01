@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { db } from "../../lib/db.js";
 import { requireAuth } from "../../lib/auth.js";
-import { getCategoryName } from "../../lib/categories.js";
+import { getSubcategoryInfo } from "../../lib/categories.js";
+import { getMajorName } from "../../lib/category-defs.js";
 import { appendRow } from "../../lib/sheets.js";
 import { categoryNameToTag } from "../../lib/hayat-tags.js";
 
@@ -24,9 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: string;
       date: string;
       amount: string;
-      category_id: string | null;
+      category_slug: string | null;
+      subcategory_id: string | null;
     }>`
-      select id, to_char(date, 'YYYY-MM-DD') as date, amount, category_id
+      select id, to_char(date, 'YYYY-MM-DD') as date, amount, category_slug, subcategory_id
       from transactions where id = ${transactionId}
     `;
     if (!txn) {
@@ -34,9 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let categoryName = "Other";
-    if (txn.category_id) {
-      const { name, parentName } = await getCategoryName(txn.category_id);
-      categoryName = parentName ?? name;
+    if (txn.subcategory_id) {
+      const subInfo = await getSubcategoryInfo(txn.subcategory_id);
+      if (subInfo) categoryName = getMajorName(subInfo.parentSlug) ?? categoryName;
+    } else if (txn.category_slug) {
+      categoryName = getMajorName(txn.category_slug) ?? categoryName;
     }
     const tag = categoryNameToTag(categoryName);
 
