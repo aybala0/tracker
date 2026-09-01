@@ -14,9 +14,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Missing id." });
   }
 
-  const { cat, sub, isShared } = req.body as { cat?: string; sub?: string | null; isShared?: boolean };
-  if (!cat) {
-    return res.status(400).json({ error: "cat is required." });
+  const { cat, sub, isShared, tier: tierRaw } = req.body as {
+    cat?: string;
+    sub?: string | null;
+    isShared?: boolean;
+    tier?: string;
+  };
+  const tier = tierRaw === "income" || tierRaw === "investment" ? tierRaw : "purchase";
+
+  if (tier === "purchase" && !cat) {
+    return res.status(400).json({ error: "cat is required for purchase transactions." });
   }
 
   try {
@@ -25,14 +32,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: "Transaction not found." });
     }
 
-    const majorId = await getCategoryIdByName(cat);
+    // Income/investment transactions aren't broken down into the purchase
+    // category list — just record the tier, no category.
+    if (tier !== "purchase") {
+      await db`
+        update transactions
+        set tier = ${tier}, category_id = null, is_shared = false, updated_at = now()
+        where id = ${id}
+      `;
+      return res.status(200).json({ ok: true });
+    }
+
+    const majorId = await getCategoryIdByName(cat!);
     if (!majorId) {
       return res.status(400).json({ error: `Unknown category: ${cat}` });
     }
 
     let categoryId = majorId;
     if (sub) {
-      const subId = await findOrCreateSubcategoryId(cat, sub);
+      const subId = await findOrCreateSubcategoryId(cat!, sub);
       if (subId) categoryId = subId;
     }
 

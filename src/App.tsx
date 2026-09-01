@@ -15,7 +15,7 @@ export default function App() {
   const { authenticated, login } = useAuth();
   const [tab, setTab] = useState<NavTarget>("Home");
   const { linked, refresh } = useBankStatus();
-  const { inbox, categorize, share } = useTransactions();
+  const { inbox, categorize, share, categorizeTier } = useTransactions();
 
   if (authenticated === null) {
     return <div className="min-h-screen bg-white" />;
@@ -32,7 +32,9 @@ export default function App() {
         </div>
       )}
       {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} />}
-      {tab === "Inbox" && <InboxScreen inbox={inbox} onCategorize={categorize} onShare={share} />}
+      {tab === "Inbox" && (
+        <InboxScreen inbox={inbox} onCategorize={categorize} onShare={share} onFinishTier={categorizeTier} />
+      )}
       {tab === "Categories" && <CategoriesScreen />}
       {tab === "Analysis" && <AnalysisScreen />}
 

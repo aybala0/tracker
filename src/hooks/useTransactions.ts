@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Transaction } from "../types";
+import type { Tier, Transaction } from "../types";
 
 /**
  * Owns the uncategorized transaction inbox. `categorize` assigns a
@@ -55,5 +55,21 @@ export function useTransactions() {
       });
   }, []);
 
-  return { transactions: inbox, inbox, categorize, share, loading };
+  /**
+   * Labels a transaction as Income or Investment — these tiers aren't
+   * broken down into the purchase category list, so there's nothing to
+   * pick, just a tier to record.
+   */
+  const categorizeTier = useCallback((id: string, tier: Extract<Tier, "Income" | "Investment">) => {
+    setInbox((prev) => prev.filter((t) => t.id !== id));
+    fetch(`/api/transactions/${id}/categorize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier: tier.toLowerCase() }),
+    }).catch(() => {
+      // Optimistic removal stays even on failure — no rollback UI for this pass.
+    });
+  }, []);
+
+  return { transactions: inbox, inbox, categorize, share, categorizeTier, loading };
 }
