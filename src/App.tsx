@@ -26,9 +26,9 @@ export default function App() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col bg-white" style={{ fontFamily: "Archivo, sans-serif" }}>
-      {tab === "Home" && linked === false && (
+      {tab === "Home" && linked !== null && (
         <div className="px-[22px] pt-5">
-          <ConnectBank onConnected={refresh} />
+          <ConnectBank onConnected={refresh} idleLabel={linked ? "Add bank" : "Connect bank"} />
         </div>
       )}
       {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} />}
