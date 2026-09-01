@@ -12,11 +12,16 @@ function toYearMonth(month: string): string {
  * Owns the drill-down transaction list for a single category+month and lets
  * a transaction be relabeled (moved) to a different category.
  */
-export function useDrillTransactions(category: string, month: string) {
+export function useDrillTransactions(category: string | null, month: string) {
   const [items, setItems] = useState<DrillItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!category) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const ym = toYearMonth(month);
     fetch(`/api/summary/drill?month=${ym}&category=${encodeURIComponent(category)}`)

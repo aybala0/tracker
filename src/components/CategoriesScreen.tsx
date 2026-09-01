@@ -11,12 +11,14 @@ import { DrillRow } from "./DrillRow";
 
 export function CategoriesScreen() {
   const [month, setMonth] = useState(MONTH_OPTIONS[0]);
-  const [sel, setSel] = useState("Groceries");
+  const [sel, setSel] = useState<string | null>(null);
   const totals = useCategoryTotals(month);
   const { items, relabel } = useDrillTransactions(sel, month);
 
+  const toggleSel = (name: string) => setSel((prev) => (prev === name ? null : name));
+
   const { out, total } = slices(totals, 96, 110, 110, sel, true);
-  const selSlice = out.find((x) => x.name === sel) ?? out[0];
+  const selSlice = sel ? out.find((x) => x.name === sel) : undefined;
   const headColor = selSlice ? selSlice.color : "#000";
 
   return (
@@ -52,34 +54,38 @@ export function CategoriesScreen() {
       </div>
 
       <div className="my-1 grid place-items-center pb-3.5">
-        <PieChart data={totals} r={96} cx={110} cy={110} viewBoxSize={220} size={252} selected={sel} interactive onSelect={setSel} />
+        <PieChart data={totals} r={96} cx={110} cy={110} viewBoxSize={220} size={252} selected={sel} interactive onSelect={toggleSel} />
       </div>
 
       <div className="mb-[22px] flex flex-wrap gap-1.5">
         {out.map((s) => (
-          <CategoryChip key={s.name} name={s.name} active={sel === s.name} onClick={() => setSel(s.name)} size="sm" />
+          <CategoryChip key={s.name} name={s.name} active={sel === s.name} onClick={() => toggleSel(s.name)} size="sm" />
         ))}
       </div>
 
-      <div className="mb-0.5 flex items-center justify-between pt-3.5" style={{ borderTop: "2px solid #000" }}>
-        <div className="uppercase" style={{ font: "700 10px 'Space Mono', monospace", letterSpacing: ".16em" }}>
-          {sel} · {month.split(" ")[0]}
-        </div>
-        <div style={{ font: "600 11.5px Archivo", color: "rgba(0,0,0,.55)" }}>
-          {items.length ? `${items.length} transactions` : "nothing logged"}
-        </div>
-      </div>
+      {sel && (
+        <>
+          <div className="mb-0.5 flex items-center justify-between pt-3.5" style={{ borderTop: "2px solid #000" }}>
+            <div className="uppercase" style={{ font: "700 10px 'Space Mono', monospace", letterSpacing: ".16em" }}>
+              {sel} · {month.split(" ")[0]}
+            </div>
+            <div style={{ font: "600 11.5px Archivo", color: "rgba(0,0,0,.55)" }}>
+              {items.length ? `${items.length} transactions` : "nothing logged"}
+            </div>
+          </div>
 
-      {items.map((d) => (
-        <DrillRow
-          key={d.id}
-          item={d}
-          tagBg={headColor}
-          tagFg={fg(headColor)}
-          currentCategory={sel}
-          onRelabel={(toCategory) => relabel(d.id, toCategory, d.shared)}
-        />
-      ))}
+          {items.map((d) => (
+            <DrillRow
+              key={d.id}
+              item={d}
+              tagBg={headColor}
+              tagFg={fg(headColor)}
+              currentCategory={sel}
+              onRelabel={(toCategory) => relabel(d.id, toCategory, d.shared)}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }

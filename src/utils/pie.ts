@@ -38,7 +38,11 @@ export function slices(
     const x1 = cx + r * Math.cos(a1);
     const y1 = cy + r * Math.sin(a1);
     const large = a1 - a0 > Math.PI ? 1 : 0;
-    const off = pull && sel === k ? 8 : 0;
+    // Pull distance is inversely related to the slice's own share of the
+    // pie: a thin sliver needs a bigger nudge than a wide slice to read as
+    // clearly "popped out," since the same absolute offset creates a much
+    // smaller visual gap along a narrow arc than a wide one.
+    const off = pull && sel === k ? 11 + (1 - frac) * 9 : 0;
     out.push({
       name: k,
       amount: data[k],
