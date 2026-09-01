@@ -25,9 +25,12 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col bg-white" style={{ fontFamily: "Archivo, sans-serif" }}>
+    <div
+      className="mx-auto flex h-screen max-w-lg flex-col overflow-hidden bg-white"
+      style={{ fontFamily: "Archivo, sans-serif", height: "100dvh" }}
+    >
       {tab === "Home" && linked !== null && (
-        <div className="px-[22px] pt-5">
+        <div className="flex-none px-[22px] pt-5">
           {linked ? (
             <div className="flex items-center justify-between">
               <div style={{ font: "600 12px Archivo", color: "rgba(0,0,0,.55)" }}>
@@ -40,12 +43,15 @@ export default function App() {
           )}
         </div>
       )}
-      {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} lastSyncedAt={lastSyncedAt} />}
-      {tab === "Inbox" && (
-        <InboxScreen inbox={inbox} onCategorize={categorize} onShare={share} onFinishTier={categorizeTier} />
-      )}
-      {tab === "Categories" && <CategoriesScreen />}
-      {tab === "Analysis" && <AnalysisScreen />}
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {tab === "Home" && <HomeScreen inboxCount={inbox.length} onNavigate={setTab} lastSyncedAt={lastSyncedAt} />}
+        {tab === "Inbox" && (
+          <InboxScreen inbox={inbox} onCategorize={categorize} onShare={share} onFinishTier={categorizeTier} />
+        )}
+        {tab === "Categories" && <CategoriesScreen />}
+        {tab === "Analysis" && <AnalysisScreen />}
+      </div>
 
       <BottomNav active={tab} onNavigate={setTab} inboxCount={inbox.length} />
     </div>
