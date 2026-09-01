@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 export function useBankStatus() {
   const [linked, setLinked] = useState<boolean | null>(null); // null = still checking
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [institutions, setInstitutions] = useState<string[]>([]);
 
   const refresh = useCallback(() => {
     fetch("/api/accounts/status")
@@ -10,6 +11,7 @@ export function useBankStatus() {
       .then((data) => {
         setLinked(!!data.linked);
         setLastSyncedAt(data.lastSyncedAt ?? null);
+        setInstitutions(data.institutions ?? []);
       })
       .catch(() => setLinked(false));
   }, []);
@@ -18,5 +20,5 @@ export function useBankStatus() {
     refresh();
   }, [refresh]);
 
-  return { linked, lastSyncedAt, refresh };
+  return { linked, lastSyncedAt, institutions, refresh };
 }

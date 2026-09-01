@@ -41,6 +41,30 @@ async function exchange(req: VercelRequest, res: VercelResponse) {
     institutionName = inst.data.institution.name;
   }
 
+  const accountsResp = await plaidClient.accountsGet({ access_token: accessToken });
+  const incomingAccounts = accountsResp.data.accounts;
+
+  // Guard against reconnecting an account that's already linked. Plaid issues
+  // a fresh item_id/account_id for every Link session, even for the exact
+  // same real bank account, so dedup can't rely on Plaid's own ids — compare
+  // institution + account mask instead, the one thing that stays stable.
+  if (institutionName) {
+    const masks = incomingAccounts.map((a) => a.mask).filter((m): m is string => !!m);
+    if (masks.length > 0) {
+      const existing = await db<{ mask: string }>`
+        select distinct a.mask
+        from accounts a
+        join plaid_items pi on pi.id = a.plaid_item_id
+        where pi.institution_name = ${institutionName} and a.mask = any(${masks})
+      `;
+      if (existing.length === new Set(masks).size) {
+        return res.status(409).json({
+          error: `${institutionName} looks like it's already connected — this would create a duplicate rather than a new account.`,
+        });
+      }
+    }
+  }
+
   const [item] = await db<{ id: string }>`
     insert into plaid_items (item_id, access_token, institution_name)
     values (${itemId}, ${accessToken}, ${institutionName})
@@ -48,8 +72,7 @@ async function exchange(req: VercelRequest, res: VercelResponse) {
     returning id
   `;
 
-  const accountsResp = await plaidClient.accountsGet({ access_token: accessToken });
-  for (const a of accountsResp.data.accounts) {
+  for (const a of incomingAccounts) {
     await db`
       insert into accounts (
         plaid_item_id, plaid_account_id, name, type, subtype, mask,
