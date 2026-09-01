@@ -110,7 +110,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
           <button
             type="button"
             onClick={onToggle}
-            className="mt-[9px] grid place-items-center uppercase"
+            className="mt-[9px] inline-flex items-center justify-center uppercase"
             style={{ height: 36, padding: "0 13px", border: "2px solid #000", background: btnBg, color: btnFg, font: "800 11.5px Archivo", letterSpacing: ".08em" }}
           >
             {open ? "Close" : "Label"}
