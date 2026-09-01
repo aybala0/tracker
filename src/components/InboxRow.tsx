@@ -186,7 +186,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                 className="mb-2"
                 style={{ font: "400 9.5px 'Space Mono', monospace", letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(0,0,0,.62)" }}
               >
-                Subcategory of {cat} — optional
+                Subcategory  
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {subOptions.map((n, i) => {
