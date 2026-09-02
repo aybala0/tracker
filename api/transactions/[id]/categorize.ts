@@ -28,7 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [existing] = await db<{ id: string }>`select id from transactions where id = ${id}`;
+    const [existing] = await db<{ id: string; description: string }>`
+      select id, description from transactions where id = ${id}
+    `;
     if (!existing) {
       return res.status(404).json({ error: "Transaction not found." });
     }
@@ -41,7 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         set tier = ${tier}, category_slug = null, subcategory_id = null, is_shared = false, updated_at = now()
         where id = ${id}
       `;
-      return res.status(200).json({ ok: true });
+      // Propagate to every other transaction still sitting uncategorized
+      // with this exact description — labeling one instance labels all the
+      // repeats immediately, rather than making the user do it one by one
+      // or wait for a separate backfill. (Sharing to Hayat never
+      // propagates — that's a per-transaction decision, not a rule.)
+      const siblingRows = await db<{ id: string }>`
+        update transactions
+        set tier = ${tier}, category_slug = null, subcategory_id = null, updated_at = now()
+        where description = ${existing.description} and tier is null and id != ${id}
+        returning id
+      `;
+      return res.status(200).json({ ok: true, siblingsUpdated: siblingRows.length });
     }
 
     const majorSlug = resolveMajorSlug(cat!);
@@ -58,7 +71,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       where id = ${id}
     `;
 
-    return res.status(200).json({ ok: true });
+    const siblingRows = await db<{ id: string }>`
+      update transactions
+      set tier = 'purchase', category_slug = ${majorSlug}, subcategory_id = ${subcategoryId}, updated_at = now()
+      where description = ${existing.description} and tier is null and id != ${id}
+      returning id
+    `;
+
+    return res.status(200).json({ ok: true, siblingsUpdated: siblingRows.length });
   } catch (err) {
     console.error("categorize transaction error:", err);
     return res.status(500).json({ error: "Failed to categorize transaction." });

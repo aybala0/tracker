@@ -45,6 +45,18 @@ function getSheets() {
   return google.sheets({ version: "v4", auth: getAuth() });
 }
 
+async function getSheetIdByTitle(sheets: ReturnType<typeof getSheets>, title: string): Promise<number> {
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+    fields: "sheets.properties",
+  });
+  const sheet = res.data.sheets?.find((s) => s.properties?.title === title);
+  if (sheet?.properties?.sheetId == null) {
+    throw new Error(`Could not find sheet tab "${title}" in spreadsheet.`);
+  }
+  return sheet.properties.sheetId;
+}
+
 function rowToHayatRow(row: string[], index: number): HayatRow {
   const paidByRaw = row[4] ?? "";
   const paidBy: "Aybala" | "Erdem" = paidByRaw === "Erdem" ? "Erdem" : "Aybala";
@@ -73,18 +85,33 @@ export async function getRows(): Promise<HayatRow[]> {
 }
 
 /**
- * Appends one new row at the end of the sheet. Uses values.append with
- * INSERT_ROWS so the row always lands physically at the bottom — this keeps
- * row numbers stable for every previously-read row, which updateNotes below
- * depends on.
+ * Inserts one new row at the top of the data (row 2, right below the
+ * header) so the most recent transaction always shows first. Inserts a
+ * blank row first so existing rows shift down, then writes the values into
+ * it, rather than appending at the bottom.
  */
 export async function appendRow(row: NewHayatRow): Promise<void> {
   const sheets = getSheets();
-  await sheets.spreadsheets.values.append({
+  const sheetId = await getSheetIdByTitle(sheets, "Sheet1");
+
+  await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
-    range: DATA_RANGE,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: { sheetId, dimension: "ROWS", startIndex: 1, endIndex: 2 },
+            inheritFromBefore: false,
+          },
+        },
+      ],
+    },
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: "Sheet1!A2:H2",
     valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: [
         [
