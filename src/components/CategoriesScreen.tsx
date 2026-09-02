@@ -13,7 +13,7 @@ export function CategoriesScreen() {
   const [month, setMonth] = useState(MONTH_OPTIONS[0]);
   const [sel, setSel] = useState<string | null>(null);
   const totals = useCategoryTotals(month);
-  const { items, relabel } = useDrillTransactions(sel, month);
+  const { items, relabel, unshare } = useDrillTransactions(sel, month);
 
   const toggleSel = (name: string) => setSel((prev) => (prev === name ? null : name));
 
@@ -82,6 +82,7 @@ export function CategoriesScreen() {
               tagFg={fg(headColor)}
               currentCategory={sel}
               onRelabel={(toCategory) => relabel(d.id, toCategory, d.shared)}
+              onUnshare={() => unshare(d.id)}
             />
           ))}
         </>

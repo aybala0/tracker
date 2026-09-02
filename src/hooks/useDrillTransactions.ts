@@ -15,6 +15,7 @@ function toYearMonth(month: string): string {
 export function useDrillTransactions(category: string | null, month: string) {
   const [items, setItems] = useState<DrillItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (!category) {
@@ -29,7 +30,7 @@ export function useDrillTransactions(category: string | null, month: string) {
       .then((data: DrillItem[]) => setItems(data))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [category, month]);
+  }, [category, month, reloadTick]);
 
   // Note: the item's own `id` is needed to relabel the right row, so this
   // takes (id, toCategory) rather than toCategory alone — the call site
@@ -49,5 +50,24 @@ export function useDrillTransactions(category: string | null, month: string) {
     [category]
   );
 
-  return { items, relabel, loading };
+  /**
+   * Undoes a mistaken "shared" label: clears the shared flags on the
+   * transaction and removes the row this app wrote to the Hayat sheet.
+   * Refetches on success rather than patching in place, since a
+   * `source = 'hayat'` row (synthetic, no real Plaid transaction) gets
+   * deleted server-side and should just disappear from this list.
+   */
+  const unshare = useCallback((id: string) => {
+    fetch(`/api/hayat/share`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactionId: id }),
+    })
+      .then(() => setReloadTick((t) => t + 1))
+      .catch(() => {
+        // Leave the row as-is on failure — no rollback/error UI for this pass.
+      });
+  }, []);
+
+  return { items, relabel, unshare, loading };
 }

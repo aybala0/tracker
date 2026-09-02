@@ -11,10 +11,17 @@ type Props = {
   /** The category this drill-down list is currently showing, highlighted in the relabel picker. */
   currentCategory: string;
   onRelabel: (toCategory: string) => void;
+  onUnshare: () => void;
 };
 
-export function DrillRow({ item, tagBg, tagFg, currentCategory, onRelabel }: Props) {
+export function DrillRow({ item, tagBg, tagFg, currentCategory, onRelabel, onUnshare }: Props) {
   const [editing, setEditing] = useState(false);
+
+  const handleUnshare = () => {
+    if (window.confirm(`Unmark "${item.desc}" as shared and remove it from the Hayat sheet?`)) {
+      onUnshare();
+    }
+  };
 
   return (
     <div>
@@ -26,8 +33,19 @@ export function DrillRow({ item, tagBg, tagFg, currentCategory, onRelabel }: Pro
               {item.tag}
             </span>
             {item.shared && (
-              <span style={{ background: "#17BEBB", border: "1.5px solid #000", padding: "2px 7px", font: "700 11px Archivo" }}>
+              <span
+                className="flex items-center gap-1.5"
+                style={{ background: "#17BEBB", border: "1.5px solid #000", padding: "2px 7px", font: "700 11px Archivo" }}
+              >
                 Hayat 50/50
+                <button
+                  type="button"
+                  onClick={handleUnshare}
+                  className="underline"
+                  style={{ font: "700 11px Archivo" }}
+                >
+                  Unshare
+                </button>
               </span>
             )}
             <span
