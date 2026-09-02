@@ -21,7 +21,7 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
           Inbox
         </div>
         <div className="mt-[5px]" style={{ font: "500 12.5px Archivo", color: "rgba(0,0,0,.6)" }}>
-          {inbox.length} uncategorized{oldest ? ` · oldest ${oldest.date}` : ""}
+          {inbox.length} uncategorized
         </div>
       </div>
 
