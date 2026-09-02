@@ -165,7 +165,6 @@ export function HomeScreen({ inboxCount, onNavigate, lastSyncedAt }: Props) {
       >
         <div className="flex-1">
           <div style={{ font: "800 17px Archivo", letterSpacing: "-.01em" }}>{inboxCount} to categorize</div>
-          <div style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.6)" }}>3 auto-matched by rule · 2 look shared</div>
         </div>
         <div
           className="grid place-items-center uppercase"
