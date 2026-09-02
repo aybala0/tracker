@@ -35,7 +35,7 @@ export function DrillRow({ item, tagBg, tagFg, currentCategory, onRelabel, onUns
             {item.shared && (
               <span
                 className="flex items-center gap-1.5"
-                style={{ background: "#17BEBB", border: "1.5px solid #000", padding: "2px 7px", font: "700 11px Archivo" }}
+                style={{ background: "#fcba03", border: "1.5px solid #000", padding: "2px 7px", font: "700 11px Archivo" }}
               >
                 Hayat 50/50
                 <button
