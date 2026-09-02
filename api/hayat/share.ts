@@ -3,10 +3,57 @@ import { db } from "../../lib/db.js";
 import { requireAuth } from "../../lib/auth.js";
 import { getSubcategoryInfo } from "../../lib/categories.js";
 import { getMajorName } from "../../lib/category-defs.js";
-import { appendRow } from "../../lib/sheets.js";
+import { appendRow, deleteRowByTransactionId } from "../../lib/sheets.js";
 import { categoryNameToTag } from "../../lib/hayat-tags.js";
 
+/**
+ * Undoes a mistaken "Shared?" tap: clears the transaction's shared flags and
+ * removes the row this endpoint's POST wrote to the Hayat sheet (matched by
+ * the `ft:{transactionId}` marker in Notes). A `source = 'hayat'` row has no
+ * real Plaid transaction behind it — it only exists to carry the share, so
+ * once unshared it's deleted outright instead of left as an empty purchase.
+ */
+async function unshare(req: VercelRequest, res: VercelResponse) {
+  const { transactionId } = req.body as { transactionId?: string };
+  if (!transactionId) {
+    return res.status(400).json({ error: "transactionId is required." });
+  }
+
+  const [txn] = await db<{ id: string; is_shared: boolean; source: string }>`
+    select id, is_shared, source from transactions where id = ${transactionId}
+  `;
+  if (!txn) {
+    return res.status(404).json({ error: "Transaction not found." });
+  }
+  if (!txn.is_shared) {
+    return res.status(400).json({ error: "Transaction is not marked shared." });
+  }
+
+  if (txn.source === "hayat") {
+    await db`delete from transactions where id = ${transactionId}`;
+  } else {
+    await db`
+      update transactions
+      set is_shared = false, shared_amount = null, hayat_logged = false, updated_at = now()
+      where id = ${transactionId}
+    `;
+  }
+
+  const sheetRowRemoved = await deleteRowByTransactionId(transactionId);
+  return res.status(200).json({ ok: true, sheetRowRemoved });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "DELETE") {
+    if (!(await requireAuth(req, res))) return;
+    try {
+      return await unshare(req, res);
+    } catch (err) {
+      console.error("hayat unshare error:", err);
+      return res.status(500).json({ error: "Failed to unshare expense." });
+    }
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

@@ -1,3 +1,0 @@
-amazon-orders
-requests
-python-dotenv

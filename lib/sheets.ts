@@ -141,3 +141,32 @@ export async function updateNotes(rowNumber: number, notes: string): Promise<voi
     },
   });
 }
+
+/**
+ * Deletes the sheet row that was written for a given transaction (the
+ * app tags its own rows with `ft:{transactionId}` in Notes, per
+ * SELF_WRITE_PREFIX in hayat-sync.ts). Returns false without erroring if no
+ * matching row is found — e.g. it was already removed by hand.
+ */
+export async function deleteRowByTransactionId(transactionId: string): Promise<boolean> {
+  const sheets = getSheets();
+  const rows = await getRows();
+  const marker = `ft:${transactionId}`;
+  const match = rows.find((r) => r.notes.includes(marker));
+  if (!match) return false;
+
+  const sheetId = await getSheetIdByTitle(sheets, "Sheet1");
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: { sheetId, dimension: "ROWS", startIndex: match.rowNumber - 1, endIndex: match.rowNumber },
+          },
+        },
+      ],
+    },
+  });
+  return true;
+}
