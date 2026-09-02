@@ -19,8 +19,19 @@ export function useTransactions() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Categorizing one transaction also categorizes every other transaction
+  // still uncategorized with the exact same description — the backend
+  // propagates this server-side (see api/transactions/[id]/categorize.ts),
+  // so the local optimistic removal mirrors it here: drop the whole
+  // matching-description group from the inbox immediately, not just the
+  // one row that was clicked.
+  const removeMatchingDescription = (prev: Transaction[], id: string): Transaction[] => {
+    const desc = prev.find((t) => t.id === id)?.desc;
+    return prev.filter((t) => t.id !== id && t.desc !== desc);
+  };
+
   const categorize = useCallback((id: string, cat: string, sub: string | null) => {
-    setInbox((prev) => prev.filter((t) => t.id !== id));
+    setInbox((prev) => removeMatchingDescription(prev, id));
     fetch(`/api/transactions/${id}/categorize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,10 +45,12 @@ export function useTransactions() {
    * Categorizes a transaction AND logs it as a 50/50 shared expense to
    * Hayat. Categorize must complete first — `/api/hayat/share` reads the
    * transaction's already-set category to build the sheet row's tag, so it
-   * can't run before the category is actually saved.
+   * can't run before the category is actually saved. Sharing itself never
+   * propagates to same-description siblings — that stays a one-at-a-time,
+   * deliberate action since it writes to the real shared sheet.
    */
   const share = useCallback((id: string, cat: string, sub: string | null, description: string) => {
-    setInbox((prev) => prev.filter((t) => t.id !== id));
+    setInbox((prev) => removeMatchingDescription(prev, id));
     fetch(`/api/transactions/${id}/categorize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,7 +74,7 @@ export function useTransactions() {
    * pick, just a tier to record.
    */
   const categorizeTier = useCallback((id: string, tier: Extract<Tier, "Income" | "Investment">) => {
-    setInbox((prev) => prev.filter((t) => t.id !== id));
+    setInbox((prev) => removeMatchingDescription(prev, id));
     fetch(`/api/transactions/${id}/categorize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

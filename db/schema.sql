@@ -126,4 +126,32 @@ drop table if exists categories;
 -- are, but assigned programmatically, never chosen through the UI.
 alter table transactions drop constraint if exists transactions_tier_check;
 alter table transactions add constraint transactions_tier_check
-  check (tier in ('income', 'purchase', 'investment', 'transfer'));
+  check (tier in ('income', 'purchase', 'investment', 'transfer', 'split'));
+
+-- Amazon order import (see lib/amazon-match.ts): a local script using the
+-- amazon-orders library scrapes real order history (Amazon has no order
+-- API, and the scraper needs your real login/2FA, which doesn't fit a
+-- Vercel serverless function) and pushes it here via
+-- api/amazon/import-orders.ts. `matched` tracks whether this order has
+-- already been linked to a bank transaction, so re-imports don't re-scan it.
+create table if not exists amazon_orders (
+  id uuid primary key default gen_random_uuid(),
+  order_id text not null unique,
+  order_date date not null,
+  items jsonb not null,
+  grand_total numeric(12, 2),
+  matched boolean not null default false,
+  imported_at timestamptz not null default now()
+);
+
+-- 'split' tier: this transaction's real amount is represented by its
+-- itemized amazon-item children instead (see parent_transaction_id below) —
+-- excluded from the inbox and spend totals the same way transfer/income/
+-- investment are, but the child rows are real 'purchase' rows that DO count.
+alter table transactions drop constraint if exists transactions_source_check;
+alter table transactions add constraint transactions_source_check
+  check (source in ('plaid', 'hayat', 'amazon-item'));
+
+-- Only set on source = 'amazon-item' rows: points back at the original
+-- Plaid transaction (now tier = 'split') that this item was carved out of.
+alter table transactions add column if not exists parent_transaction_id uuid references transactions(id) on delete cascade;
