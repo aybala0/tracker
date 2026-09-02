@@ -76,7 +76,7 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
               <div style={{ height: 2, background: "#000" }} />
               <div className="mt-4 flex items-center justify-between gap-3">
                 <div style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.5)" }}>
-                  Rules matched {matched.length} of these before you woke up.
+                  Rules matched {matched.length} of these.
                 </div>
                 <button
                   type="button"
@@ -84,7 +84,7 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
                   className="inline-flex flex-none items-center justify-center uppercase"
                   style={{ height: 34, padding: "0 14px", border: "2px solid #000", background: "#000", color: "#fff", font: "800 11px Archivo", letterSpacing: ".08em" }}
                 >
-                  Review all
+                  Confirm all
                 </button>
               </div>
               <div className="mt-2">{matched.map((t) => renderRow(t, true))}</div>

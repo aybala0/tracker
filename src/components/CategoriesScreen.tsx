@@ -39,17 +39,19 @@ export function CategoriesScreen() {
         </select>
       </div>
 
-      <div className="mb-3.5" style={{ background: sel ? headColor : "#000", color: fg(sel ? headColor : "#000"), border: "2px solid #000", padding: "14px 16px" }}>
+      <div className="mb-3.5" style={{ background: headColor, color: fg(headColor), border: "2px solid #000", padding: "14px 16px" }}>
         <div className="mb-1 uppercase" style={{ font: "700 10px 'Space Mono', monospace", letterSpacing: ".16em" }}>
-          {selSlice ? selSlice.name : ""}
+          {selSlice ? selSlice.name : `Total · ${month.split(" ")[0]}`}
         </div>
         <div className="flex items-baseline gap-2.5">
           <div style={{ font: "900 34px/1 Archivo", letterSpacing: "-.03em", fontVariantNumeric: "tabular-nums" }}>
-            {selSlice ? short(selSlice.amount) : ""}
+            {short(selSlice ? selSlice.amount : total)}
           </div>
-          <div style={{ font: "600 12px Archivo" }}>
-            {selSlice ? `${Math.round(selSlice.frac * 100)}% of ${short(total)}` : ""}
-          </div>
+          {selSlice && (
+            <div style={{ font: "600 12px Archivo" }}>
+              {Math.round(selSlice.frac * 100)}% of {short(total)}
+            </div>
+          )}
         </div>
       </div>
 
