@@ -14,6 +14,8 @@ type Props = {
   onCategorize: (cat: string, sub: string | null) => void;
   onShare: (cat: string, sub: string | null, description: string) => void;
   onFinishTier: (tier: Extract<Tier, "Income" | "Investment">) => void;
+  /** True for rows in the "already matched" section — starts the editor pre-filled with the rule's suggestion and shows a suggestion chip + "Edit" instead of "Label" when closed. */
+  matched?: boolean;
 };
 
 const TIERS: Tier[] = ["Income", "Purchase", "Investment"];
@@ -22,7 +24,7 @@ function plainChip(active: boolean) {
   return active ? { bg: "#000", fg: "#fff" } : { bg: "#fff", fg: "#000" };
 }
 
-export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTier }: Props) {
+export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTier, matched = false }: Props) {
   const [tier, setTier] = useState<Tier | null>(null);
   const [cat, setCat] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
@@ -35,18 +37,20 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
 
   // Reset local labeling state whenever the row opens or closes. Purchase is
   // the default tier — it's the overwhelmingly common case for a bank feed.
+  // Matched rows start pre-filled with the rule's suggested cat/sub so
+  // "Edit" opens straight into something the user can just confirm.
   useEffect(() => {
     if (open) {
       setTier("Purchase");
-      setCat(null);
-      setSub(null);
+      setCat(matched ? tx.cat ?? null : null);
+      setSub(matched ? tx.sub ?? null : null);
       setHayat(false);
       setHayatDesc("");
       setOtherOpen(false);
       setAddingSub(false);
       setNewSubName("");
     }
-  }, [open]);
+  }, [open, matched, tx.cat, tx.sub]);
 
   // Real subcategory suggestions for the selected major, fetched from the
   // API's live data instead of the old SUBS mock. GET /api/categories
@@ -99,6 +103,14 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             {tx.date}
           </div>
           <div style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em" }}>{tx.desc}</div>
+          {matched && !open && tx.cat && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <CategoryChip name={tx.sub ?? tx.cat} active size="sm" />
+              {tx.rule && (
+                <span style={{ font: "400 10.5px Archivo", color: "rgba(0,0,0,.45)" }}>{tx.rule}</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex-none text-right">
           <div style={{ font: "800 19px Archivo", fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em" }}>
@@ -110,7 +122,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             className="mt-[9px] inline-flex items-center justify-center uppercase"
             style={{ height: 36, padding: "0 13px", border: "2px solid #000", background: btnBg, color: btnFg, font: "800 11.5px Archivo", letterSpacing: ".08em" }}
           >
-            {open ? "Close" : "Label"}
+            {open ? "Close" : matched ? "Edit" : "Label"}
           </button>
         </div>
       </div>
