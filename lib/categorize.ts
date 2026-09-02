@@ -30,32 +30,38 @@ export async function matchRegexRule(description: string): Promise<RuleMatch | n
   return null;
 }
 
-export type PriorCategorization = {
-  tier: "income" | "purchase" | "investment";
-  categorySlug: string | null;
-  subcategoryId: string | null;
-};
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
- * Looks up how the same exact transaction description was categorized last
- * time it appeared, so a new transaction can skip the inbox entirely instead
- * of asking again. Auto-applied silently on ingest — no confirmation step;
- * a mistaken match gets fixed later via the categorization review section.
+ * Creates (or updates) a regex rule from a plain "if description contains
+ * ___" string the user typed while labeling a transaction — a deliberate,
+ * opt-in action rather than something every categorization triggers. Kept
+ * this way (instead of auto-learning a rule from every categorization) so
+ * regex_rules only grows for merchants the user actually knows repeat, not
+ * one row per one-off purchase. The text is escaped so it's matched
+ * literally, as a plain substring — not compiled as real regex syntax, to
+ * match the "madlib", no-regex-typing UI this is called from. Works for
+ * both purchase rules (categorySlug set) and Income/Investment rules
+ * (categorySlug/subcategoryId null, tier carries the whole suggestion).
  */
-export async function findPriorCategorization(description: string): Promise<PriorCategorization | null> {
-  const [row] = await db<{
-    tier: "income" | "purchase" | "investment";
-    category_slug: string | null;
-    subcategory_id: string | null;
-  }>`
-    select tier, category_slug, subcategory_id
-    from transactions
-    where description = ${description} and tier is not null
-    order by updated_at desc
-    limit 1
+export async function createContainsRule(
+  contains: string,
+  tier: "income" | "purchase" | "investment",
+  categorySlug: string | null,
+  subcategoryId: string | null,
+  label: string
+): Promise<string> {
+  const pattern = escapeRegExp(contains);
+  const [row] = await db<{ id: string }>`
+    insert into regex_rules (pattern, tier, category_slug, subcategory_id, label)
+    values (${pattern}, ${tier}, ${categorySlug}, ${subcategoryId}, ${label})
+    on conflict (pattern) do update
+    set tier = excluded.tier, category_slug = excluded.category_slug, subcategory_id = excluded.subcategory_id, label = excluded.label
+    returning id
   `;
-  if (!row) return null;
-  return { tier: row.tier, categorySlug: row.category_slug, subcategoryId: row.subcategory_id };
+  return row.id;
 }
 
 /**

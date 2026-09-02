@@ -9,6 +9,8 @@ export type Transaction = {
   rule: string | null;
   cat?: string;
   sub?: string;
+  /** Set when the matched rule suggests Income/Investment instead of a purchase category. */
+  ruleTier?: Extract<Tier, "Income" | "Investment">;
 };
 
 export type DrillItem = {

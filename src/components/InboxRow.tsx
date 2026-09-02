@@ -11,9 +11,9 @@ type Props = {
   tx: Transaction;
   open: boolean;
   onToggle: () => void;
-  onCategorize: (cat: string, sub: string | null) => void;
+  onCategorize: (cat: string, sub: string | null, ruleContains?: string) => void;
   onShare: (cat: string, sub: string | null, description: string) => void;
-  onFinishTier: (tier: Extract<Tier, "Income" | "Investment">) => void;
+  onFinishTier: (tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
   /** True for rows in the "already matched" section — starts the editor pre-filled with the rule's suggestion and shows a suggestion chip + "Edit" instead of "Label" when closed. */
   matched?: boolean;
 };
@@ -34,14 +34,17 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const [subOptions, setSubOptions] = useState<string[]>([]);
   const [addingSub, setAddingSub] = useState(false);
   const [newSubName, setNewSubName] = useState("");
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const [ruleContains, setRuleContains] = useState("");
 
   // Reset local labeling state whenever the row opens or closes. Purchase is
   // the default tier — it's the overwhelmingly common case for a bank feed.
-  // Matched rows start pre-filled with the rule's suggested cat/sub so
-  // "Edit" opens straight into something the user can just confirm.
+  // Matched rows start pre-filled with the rule's suggestion (category, or
+  // Income/Investment tier) so "Edit" opens straight into something the
+  // user can just confirm.
   useEffect(() => {
     if (open) {
-      setTier("Purchase");
+      setTier(matched && tx.ruleTier ? tx.ruleTier : "Purchase");
       setCat(matched ? tx.cat ?? null : null);
       setSub(matched ? tx.sub ?? null : null);
       setHayat(false);
@@ -49,8 +52,10 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
       setOtherOpen(false);
       setAddingSub(false);
       setNewSubName("");
+      setRuleOpen(false);
+      setRuleContains("");
     }
-  }, [open, matched, tx.cat, tx.sub]);
+  }, [open, matched, tx.cat, tx.sub, tx.ruleTier]);
 
   // Real subcategory suggestions for the selected major, fetched from the
   // API's live data instead of the old SUBS mock. GET /api/categories
@@ -88,9 +93,10 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const showSubs = !!cat && cat !== "Other";
   const showShared = !!cat;
 
-  const finish = () => onCategorize(cat!, sub);
+  const finish = () => onCategorize(cat!, sub, ruleOpen ? ruleContains.trim() || undefined : undefined);
   const finishShared = () => onShare(cat!, sub, hayatDesc);
-  const finishTierOnly = () => onFinishTier(tier as "Income" | "Investment");
+  const finishTierOnly = () =>
+    onFinishTier(tier as "Income" | "Investment", ruleOpen ? ruleContains.trim() || undefined : undefined);
 
   return (
     <div className="relative" style={{ borderTop: "2px solid #000", padding: "14px 0" }}>
@@ -103,9 +109,18 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             {tx.date}
           </div>
           <div style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em" }}>{tx.desc}</div>
-          {matched && !open && tx.cat && (
+          {matched && !open && (tx.cat || tx.ruleTier) && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <CategoryChip name={tx.sub ?? tx.cat} active size="sm" />
+              {tx.cat ? (
+                <CategoryChip name={tx.sub ?? tx.cat} active size="sm" />
+              ) : (
+                <span
+                  className="uppercase"
+                  style={{ border: "1.5px solid #000", padding: "3px 8px", font: "700 11px Archivo", letterSpacing: ".06em" }}
+                >
+                  {tx.ruleTier}
+                </span>
+              )}
               {tx.rule && (
                 <span style={{ font: "400 10.5px Archivo", color: "rgba(0,0,0,.45)" }}>{tx.rule}</span>
               )}
@@ -157,14 +172,38 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
           </div>
 
           {showTierOnly && (
-            <button
-              type="button"
-              onClick={finishTierOnly}
-              className="grid w-full place-items-center uppercase"
-              style={{ height: 46, background: "#000", color: "#fff", font: "800 12px Archivo", letterSpacing: ".06em" }}
-            >
-              Done
-            </button>
+            <div>
+              <div
+                onClick={() => setRuleOpen((o) => !o)}
+                className="mb-3 inline-block cursor-pointer uppercase underline"
+                style={{ font: "700 10.5px Archivo", letterSpacing: ".06em", color: "rgba(0,0,0,.6)" }}
+              >
+                {ruleOpen ? "Cancel rule" : "+ Repeats? Make it a rule"}
+              </div>
+              {ruleOpen && (
+                <div className="mb-3.5" style={{ background: "#fff", border: "1.5px solid rgba(0,0,0,.3)", padding: 12 }}>
+                  <div className="mb-2" style={{ font: "500 13px Archivo", lineHeight: 1.5 }}>
+                    Label as <strong>{tier}</strong> if description contains
+                  </div>
+                  <input
+                    autoFocus
+                    value={ruleContains}
+                    onChange={(e) => setRuleContains(e.target.value)}
+                    placeholder="e.g. paycheck"
+                    className="w-full"
+                    style={{ height: 38, border: "1.5px solid rgba(0,0,0,.3)", padding: "0 10px", font: "500 14px Archivo" }}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={finishTierOnly}
+                className="grid w-full place-items-center uppercase"
+                style={{ height: 46, background: "#000", color: "#fff", font: "800 12px Archivo", letterSpacing: ".06em" }}
+              >
+                Done
+              </button>
+            </div>
           )}
 
           {showCats && (
@@ -290,8 +329,35 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             </div>
           )}
 
-          {showShared && (
+          {showShared && !hayat && (
             <div className="mt-[22px] pt-4" style={{ borderTop: "1.5px solid rgba(0,0,0,.2)" }}>
+              <div
+                onClick={() => setRuleOpen((o) => !o)}
+                className="mb-3 inline-block cursor-pointer uppercase underline"
+                style={{ font: "700 10.5px Archivo", letterSpacing: ".06em", color: "rgba(0,0,0,.6)" }}
+              >
+                {ruleOpen ? "Cancel rule" : "+ Repeats? Make it a rule"}
+              </div>
+              {ruleOpen && (
+                <div className="mb-3.5" style={{ background: "#fff", border: "1.5px solid rgba(0,0,0,.3)", padding: 12 }}>
+                  <div className="mb-2" style={{ font: "500 13px Archivo", lineHeight: 1.5 }}>
+                    Label as <strong>{cat}{sub ? ` · ${sub}` : ""}</strong> if description contains
+                  </div>
+                  <input
+                    autoFocus
+                    value={ruleContains}
+                    onChange={(e) => setRuleContains(e.target.value)}
+                    placeholder="e.g. metra"
+                    className="w-full"
+                    style={{ height: 38, border: "1.5px solid rgba(0,0,0,.3)", padding: "0 10px", font: "500 14px Archivo" }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {showShared && (
+            <div className={hayat ? "mt-[22px] pt-4" : ""} style={hayat ? { borderTop: "1.5px solid rgba(0,0,0,.2)" } : undefined}>
               {hayat ? (
                 <div>
                   <div className="mb-3.5 flex items-center gap-2">
