@@ -4,44 +4,50 @@ import { InboxRow } from "./InboxRow";
 
 type Props = {
   inbox: Transaction[];
-  onCategorize: (id: string, cat: string, sub: string | null) => void;
+  onCategorize: (id: string, cat: string, sub: string | null, ruleContains?: string) => void;
   onShare: (id: string, cat: string, sub: string | null, description: string) => void;
-  onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">) => void;
+  onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
 };
 
 export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Rule-matched rows that already have a suggested cat come pre-labeled;
-  // they get their own review section at the bottom instead of mixing in
-  // with rows that still need a human decision.
-  const pending = inbox.filter((t) => !(t.rule && t.cat));
-  const matched = inbox.filter((t) => t.rule && t.cat);
+  // Rule-matched rows that already have a suggested cat (purchase) or a
+  // suggested tier (Income/Investment) come pre-labeled; they get their own
+  // review section at the bottom instead of mixing in with rows that still
+  // need a human decision.
+  const isMatched = (t: Transaction) => !!t.rule && (!!t.cat || !!t.ruleTier);
+  const pending = inbox.filter((t) => !isMatched(t));
+  const matched = inbox.filter(isMatched);
 
   const reviewAll = () => {
     for (const t of matched) {
-      onCategorize(t.id, t.cat!, t.sub ?? null);
+      if (t.cat) {
+        onCategorize(t.id, t.cat, t.sub ?? null);
+      } else if (t.ruleTier) {
+        onFinishTier(t.id, t.ruleTier);
+      }
     }
     setOpenId(null);
   };
 
-  const renderRow = (t: Transaction, isMatched: boolean) => (
+  const renderRow = (t: Transaction, matchedRow: boolean) => (
     <InboxRow
       key={t.id}
       tx={t}
-      matched={isMatched}
+      matched={matchedRow}
       open={openId === t.id}
       onToggle={() => setOpenId(openId === t.id ? null : t.id)}
-      onCategorize={(cat, sub) => {
-        onCategorize(t.id, cat, sub);
+      onCategorize={(cat, sub, ruleContains) => {
+        onCategorize(t.id, cat, sub, ruleContains);
         setOpenId(null);
       }}
       onShare={(cat, sub, description) => {
         onShare(t.id, cat, sub, description);
         setOpenId(null);
       }}
-      onFinishTier={(tier) => {
-        onFinishTier(t.id, tier);
+      onFinishTier={(tier, ruleContains) => {
+        onFinishTier(t.id, tier, ruleContains);
         setOpenId(null);
       }}
     />

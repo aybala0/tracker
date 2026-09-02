@@ -19,11 +19,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       amount: string;
       matched_rule_id: string | null;
       rule_label: string | null;
+      rule_tier: "income" | "purchase" | "investment" | null;
       rule_category_slug: string | null;
       rule_subcategory_id: string | null;
     }>`
       select t.id, to_char(t.date, 'YYYY-MM-DD') as date, t.description, t.amount, t.matched_rule_id,
-             r.label as rule_label, r.category_slug as rule_category_slug, r.subcategory_id as rule_subcategory_id
+             r.label as rule_label, r.tier as rule_tier, r.category_slug as rule_category_slug, r.subcategory_id as rule_subcategory_id
       from transactions t
       left join regex_rules r on r.id = t.matched_rule_id
       where t.tier is null
@@ -34,12 +35,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       rows.map(async (row) => {
         let cat: string | undefined;
         let sub: string | undefined;
-        if (row.matched_rule_id && row.rule_category_slug) {
+        let ruleTier: "Income" | "Investment" | undefined;
+        if (row.matched_rule_id && row.rule_tier === "purchase" && row.rule_category_slug) {
           cat = getMajorName(row.rule_category_slug) ?? undefined;
           if (row.rule_subcategory_id) {
             const subInfo = await getSubcategoryInfo(row.rule_subcategory_id);
             sub = subInfo?.name;
           }
+        } else if (row.matched_rule_id && row.rule_tier === "income") {
+          ruleTier = "Income";
+        } else if (row.matched_rule_id && row.rule_tier === "investment") {
+          ruleTier = "Investment";
         }
         return {
           id: row.id,
@@ -49,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           rule: row.matched_rule_id ? row.rule_label : null,
           cat,
           sub,
+          ruleTier,
         };
       })
     );

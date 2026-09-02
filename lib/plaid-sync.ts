@@ -1,6 +1,6 @@
 import { plaidClient } from "./plaid.js";
 import { db } from "./db.js";
-import { matchRegexRule, findPriorCategorization, matchCardPaymentTransfers } from "./categorize.js";
+import { matchRegexRule, matchCardPaymentTransfers } from "./categorize.js";
 
 export type PlaidSyncSummary = {
   added: number;
@@ -40,23 +40,21 @@ export async function syncAllPlaidItems(): Promise<PlaidSyncSummary> {
         if (!account) continue; // account not yet synced via exchange — skip until it is
 
         const description = t.name ?? t.merchant_name ?? "";
+        // Regex rules (including ones the user opted to create from the
+        // inbox's "repeats? make it a rule" madlib — see createContainsRule)
+        // only ever carry a suggested category/tier; they never auto-apply
+        // it. Every new transaction lands in the inbox uncategorized, with
+        // a suggestion to confirm or edit if a rule matched.
         const match = await matchRegexRule(description);
-        // If this exact description has been categorized before, apply the
-        // same labeling now — the transaction skips the inbox entirely.
-        // Only affects a fresh insert (see the `on conflict` below): an
-        // already-existing transaction never gets its category clobbered
-        // by a later sync.
-        const prior = await findPriorCategorization(description);
 
         await db`
           insert into transactions (
             plaid_transaction_id, plaid_item_id, account_id, date, description,
-            amount, matched_rule_id, raw, tier, category_slug, subcategory_id
+            amount, matched_rule_id, raw
           )
           values (
             ${t.transaction_id}, ${item.id}, ${account.id}, ${t.date}, ${description},
-            ${t.amount}, ${match?.ruleId ?? null}, ${JSON.stringify(t)},
-            ${prior?.tier ?? null}, ${prior?.categorySlug ?? null}, ${prior?.subcategoryId ?? null}
+            ${t.amount}, ${match?.ruleId ?? null}, ${JSON.stringify(t)}
           )
           on conflict (plaid_transaction_id) do update set
             amount = excluded.amount,
