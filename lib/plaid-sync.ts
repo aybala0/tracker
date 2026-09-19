@@ -76,6 +76,21 @@ export async function syncAllPlaidItems(): Promise<PlaidSyncSummary> {
       hasMore = data.has_more;
     }
 
+    // Balances only ever got written once, at initial link (api/plaid/
+    // [action].ts's exchange()) — nothing refreshed them again after that,
+    // so net worth silently drifted from reality as cards got paid down or
+    // charged up. Refresh every account on this item on every sync.
+    const accountsResp = await plaidClient.accountsGet({ access_token: item.access_token });
+    for (const a of accountsResp.data.accounts) {
+      await db`
+        update accounts
+        set current_balance = ${a.balances.current ?? null},
+            available_balance = ${a.balances.available ?? null},
+            updated_at = now()
+        where plaid_account_id = ${a.account_id}
+      `;
+    }
+
     await db`update plaid_items set cursor = ${cursor}, last_synced_at = now() where id = ${item.id}`;
   }
 
