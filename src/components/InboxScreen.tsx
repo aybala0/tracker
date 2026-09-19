@@ -5,7 +5,7 @@ import { InboxRow } from "./InboxRow";
 type Props = {
   inbox: Transaction[];
   onCategorize: (id: string, cat: string, sub: string | null, ruleContains?: string) => void;
-  onShare: (id: string, cat: string, sub: string | null, description: string) => void;
+  onShare: (id: string, cat: string, sub: string | null, description: string, ruleContains?: string) => void;
   onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
 };
 
@@ -42,8 +42,8 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
         onCategorize(t.id, cat, sub, ruleContains);
         setOpenId(null);
       }}
-      onShare={(cat, sub, description) => {
-        onShare(t.id, cat, sub, description);
+      onShare={(cat, sub, description, ruleContains) => {
+        onShare(t.id, cat, sub, description, ruleContains);
         setOpenId(null);
       }}
       onFinishTier={(tier, ruleContains) => {

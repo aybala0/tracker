@@ -12,7 +12,7 @@ type Props = {
   open: boolean;
   onToggle: () => void;
   onCategorize: (cat: string, sub: string | null, ruleContains?: string) => void;
-  onShare: (cat: string, sub: string | null, description: string) => void;
+  onShare: (cat: string, sub: string | null, description: string, ruleContains?: string) => void;
   onFinishTier: (tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
   /** True for rows in the "already matched" section — starts the editor pre-filled with the rule's suggestion and shows a suggestion chip + "Edit" instead of "Label" when closed. */
   matched?: boolean;
@@ -94,7 +94,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const showShared = !!cat;
 
   const finish = () => onCategorize(cat!, sub, ruleOpen ? ruleContains.trim() || undefined : undefined);
-  const finishShared = () => onShare(cat!, sub, hayatDesc);
+  const finishShared = () => onShare(cat!, sub, hayatDesc, ruleOpen ? ruleContains.trim() || undefined : undefined);
   const finishTierOnly = () =>
     onFinishTier(tier as "Income" | "Investment", ruleOpen ? ruleContains.trim() || undefined : undefined);
 
@@ -329,7 +329,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
             </div>
           )}
 
-          {showShared && !hayat && (
+          {showShared && (
             <div className="mt-[22px] pt-4" style={{ borderTop: "1.5px solid rgba(0,0,0,.2)" }}>
               <div
                 onClick={() => setRuleOpen((o) => !o)}
@@ -353,11 +353,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                   />
                 </div>
               )}
-            </div>
-          )}
 
-          {showShared && (
-            <div className={hayat ? "mt-[22px] pt-4" : ""} style={hayat ? { borderTop: "1.5px solid rgba(0,0,0,.2)" } : undefined}>
               {hayat ? (
                 <div>
                   <div className="mb-3.5 flex items-center gap-2">

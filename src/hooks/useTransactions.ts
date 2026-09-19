@@ -51,18 +51,22 @@ export function useTransactions() {
    * Categorizes a transaction AND logs it as a 50/50 shared expense to
    * Hayat. Categorize must complete first — `/api/hayat/share` reads the
    * transaction's already-set category to build the sheet row's tag, so it
-   * can't run before the category is actually saved. Sharing itself is
-   * always a one-at-a-time, deliberate action (it writes to the real
-   * shared sheet) — the "make it a rule" madlib isn't offered on this path,
-   * so it never touches other transactions.
+   * can't run before the category is actually saved. Sharing this one
+   * transaction is always a one-at-a-time, deliberate action (it writes to
+   * the real shared sheet) — but the "make it a rule" madlib is still
+   * available here, so ruleContains, if filled in, flags matching siblings
+   * with a suggested category the same way plain categorize does. Sharing
+   * itself is never inherited by a rule — being shared is per-transaction,
+   * so a sibling that later matches the rule still lands as a normal
+   * (non-shared) suggestion.
    */
   const share = useCallback(
-    (id: string, cat: string, sub: string | null, description: string) => {
+    (id: string, cat: string, sub: string | null, description: string, ruleContains?: string) => {
       setInbox((prev) => prev.filter((t) => t.id !== id));
       fetch(`/api/transactions/${id}/categorize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cat, sub, isShared: true }),
+        body: JSON.stringify({ cat, sub, isShared: true, ruleContains }),
       })
         .then(() =>
           fetch(`/api/hayat/share`, {
