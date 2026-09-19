@@ -22,11 +22,19 @@ export const MAJOR_CATEGORIES: { slug: string; name: string; color: string }[] =
 /** Display names in fixed order, derived from MAJOR_CATEGORIES — kept as a small export since several components just need the name list. */
 export const CATS = MAJOR_CATEGORIES.map((c) => c.name);
 
-export const MONTH_OPTIONS = [
-  "August 2026",
-  "July 2026",
-  "June 2026",
-  "May 2026",
-  "April 2026",
-  "March 2026",
-];
+/**
+ * Current month first, going back `count` months — computed from today's
+ * date instead of a fixed list, so a new month shows up in the Categories
+ * dropdown on its own instead of needing this file edited every month.
+ */
+function monthOptions(count = 12): string[] {
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+  }
+  return months;
+}
+
+export const MONTH_OPTIONS = monthOptions();
