@@ -10,7 +10,8 @@ function toYearMonth(month: string): string {
 
 /**
  * Owns the drill-down transaction list for a single category+month and lets
- * a transaction be relabeled (moved) to a different category.
+ * a row be fully edited: category, subcategory, description, shared
+ * status, and an opt-in repeat rule.
  */
 export function useDrillTransactions(category: string | null, month: string) {
   const [items, setItems] = useState<DrillItem[]>([]);
@@ -32,42 +33,66 @@ export function useDrillTransactions(category: string | null, month: string) {
       .finally(() => setLoading(false));
   }, [category, month, reloadTick]);
 
-  // Note: the item's own `id` is needed to relabel the right row, so this
-  // takes (id, toCategory) rather than toCategory alone — the call site
-  // (DrillRow via CategoriesScreen) closes over the item to supply `id`.
-  const relabel = useCallback(
-    (id: string, toCategory: string, shared: boolean) => {
-      if (toCategory === category) return;
+  /**
+   * Full edit for one drill-down row: category, subcategory, description,
+   * shared status, and an opt-in "repeats? make it a rule" rule — all in
+   * one save. `wasShared`/`shared` together decide whether to also call
+   * /api/hayat/share: POST (write a new sheet row) when going false→true,
+   * DELETE (remove the sheet row this app wrote, or the synthetic
+   * `source = 'hayat'` transaction outright) when going true→false. No call
+   * either way if shared status didn't change. Always refetches on success
+   * rather than patching in place — a category change, an unshare on a
+   * synthetic row, or a rule flagging siblings can all change which rows
+   * belong in this list.
+   */
+  const editTransaction = useCallback(
+    (
+      id: string,
+      opts: {
+        cat: string;
+        sub: string | null;
+        description?: string;
+        ruleContains?: string;
+        shared: boolean;
+        wasShared: boolean;
+        hayatDescription?: string;
+      }
+    ) => {
       setItems((prev) => prev.filter((d) => d.id !== id));
       fetch(`/api/transactions/${id}/categorize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cat: toCategory, sub: null, isShared: shared }),
-      }).catch(() => {
-        // Optimistic removal stays even on failure — no rollback UI for this pass.
-      });
+        body: JSON.stringify({
+          cat: opts.cat,
+          sub: opts.sub,
+          isShared: opts.shared,
+          ruleContains: opts.ruleContains,
+          description: opts.description,
+        }),
+      })
+        .then(() => {
+          if (opts.shared && !opts.wasShared) {
+            return fetch(`/api/hayat/share`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ transactionId: id, description: opts.hayatDescription ?? "" }),
+            });
+          }
+          if (!opts.shared && opts.wasShared) {
+            return fetch(`/api/hayat/share`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ transactionId: id }),
+            });
+          }
+        })
+        .then(() => setReloadTick((t) => t + 1))
+        .catch(() => {
+          // Optimistic removal stays even on failure — no rollback UI for this pass.
+        });
     },
-    [category]
+    []
   );
 
-  /**
-   * Undoes a mistaken "shared" label: clears the shared flags on the
-   * transaction and removes the row this app wrote to the Hayat sheet.
-   * Refetches on success rather than patching in place, since a
-   * `source = 'hayat'` row (synthetic, no real Plaid transaction) gets
-   * deleted server-side and should just disappear from this list.
-   */
-  const unshare = useCallback((id: string) => {
-    fetch(`/api/hayat/share`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transactionId: id }),
-    })
-      .then(() => setReloadTick((t) => t + 1))
-      .catch(() => {
-        // Leave the row as-is on failure — no rollback/error UI for this pass.
-      });
-  }, []);
-
-  return { items, relabel, unshare, loading };
+  return { items, editTransaction, loading };
 }

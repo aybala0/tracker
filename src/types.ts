@@ -20,6 +20,7 @@ export type DrillItem = {
   amt: number;
   date: string;
   shared: boolean;
+  sub?: string;
 };
 
 export type NavTarget = "Home" | "Inbox" | "Categories" | "Analysis";

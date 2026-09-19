@@ -16,13 +16,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Missing id." });
   }
 
-  const { cat, sub, isShared, tier: tierRaw, ruleContains } = req.body as {
+  const { cat, sub, isShared, tier: tierRaw, ruleContains, description } = req.body as {
     cat?: string;
     sub?: string | null;
     isShared?: boolean;
     tier?: string;
     /** Optional "if description contains ___" text from the madlib rule-creation UI. */
     ruleContains?: string;
+    /** Optional rename — only ever applied to this one transaction, never propagated. */
+    description?: string;
   };
   const tier = tierRaw === "income" || tierRaw === "investment" ? tierRaw : "purchase";
 
@@ -36,6 +38,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `;
     if (!existing) {
       return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    // A rename only ever touches this one row's display text — it has no
+    // effect on future rule matching (new Plaid syncs set description fresh
+    // from the bank's own data) and isn't propagated to any other row.
+    if (description && description.trim()) {
+      await db`update transactions set description = ${description.trim()}, updated_at = now() where id = ${id}`;
     }
 
     // Income/investment transactions aren't broken down into the purchase

@@ -114,6 +114,7 @@ async function drill(req: VercelRequest, res: VercelResponse) {
     amt: Math.abs(Number(r.amount)),
     date: fmtDayMonth(r.date),
     shared: r.is_shared,
+    sub: r.sub_name ?? undefined,
   }));
   return res.status(200).json(result);
 }
