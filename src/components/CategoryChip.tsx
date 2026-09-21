@@ -6,11 +6,13 @@ type Props = {
   active: boolean;
   onClick?: () => void;
   size?: "sm" | "md";
+  /** Overrides the looked-up category color — for a pseudo-category chip like "All" that has no entry in MAJOR_CATEGORIES. */
+  color?: string;
 };
 
 /** A category chip: locked to the category's fixed color when selected, matching the pie slice / drill-down tag for that category everywhere. */
-export function CategoryChip({ name, active, onClick, size = "md" }: Props) {
-  const color = colorForCategory(name);
+export function CategoryChip({ name, active, onClick, size = "md", color: colorOverride }: Props) {
+  const color = colorOverride ?? colorForCategory(name);
   const bg = active ? color : "#fff";
   const textColor = active ? fg(color) : "#2d2b2b";
   const dot = active ? textColor : color;

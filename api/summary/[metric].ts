@@ -119,6 +119,121 @@ async function drill(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json(result);
 }
 
+type Granularity = "month" | "week" | "day";
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function ym(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+/** Monday of the week containing `d`, matching Postgres's date_trunc('week', ...) convention. */
+function mondayOf(d: Date): Date {
+  const day = d.getDay(); // 0 = Sunday .. 6 = Saturday
+  const diff = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+  return monday;
+}
+
+/** Every bucket key (in the same format the SQL `group by` below produces) from `months` back through today, inclusive. */
+function bucketList(months: number, granularity: Granularity): string[] {
+  const now = new Date();
+  const buckets: string[] = [];
+  if (granularity === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+    for (const d = new Date(start); d <= now; d.setMonth(d.getMonth() + 1)) buckets.push(ym(d));
+  } else if (granularity === "week") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
+    for (let d = mondayOf(cutoff), last = mondayOf(now); d <= last; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7)) {
+      buckets.push(ymd(d));
+    }
+  } else {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
+    for (let d = cutoff, last = now; ymd(d) <= ymd(last); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      buckets.push(ymd(d));
+    }
+  }
+  return buckets;
+}
+
+async function trend(req: VercelRequest, res: VercelResponse) {
+  const { months, category, granularity: rawGranularity } = req.query as {
+    months?: string;
+    category?: string;
+    granularity?: string;
+  };
+  const count = Math.min(24, Math.max(1, Number(months) || 6));
+  const granularity: Granularity =
+    rawGranularity === "week" || rawGranularity === "day" ? rawGranularity : "month";
+
+  let categorySlug: string | null = null;
+  if (category) {
+    categorySlug = resolveMajorSlug(category);
+    if (!categorySlug) {
+      return res.status(400).json({ error: `Unknown category: ${category}` });
+    }
+  }
+
+  const buckets = bucketList(count, granularity);
+  const startDate = granularity === "month" ? `${buckets[0]}-01` : buckets[0];
+
+  const rows =
+    granularity === "month"
+      ? categorySlug
+        ? await db<{ bucket: string; total: string }>`
+            select to_char(t.date, 'YYYY-MM') as bucket,
+              sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+            from transactions t
+            where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
+            group by to_char(t.date, 'YYYY-MM')
+          `
+        : await db<{ bucket: string; total: string }>`
+            select to_char(t.date, 'YYYY-MM') as bucket,
+              sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+            from transactions t
+            where t.tier = 'purchase' and t.date >= ${startDate}
+            group by to_char(t.date, 'YYYY-MM')
+          `
+      : granularity === "week"
+        ? categorySlug
+          ? await db<{ bucket: string; total: string }>`
+              select to_char(date_trunc('week', t.date), 'YYYY-MM-DD') as bucket,
+                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+              from transactions t
+              where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
+              group by to_char(date_trunc('week', t.date), 'YYYY-MM-DD')
+            `
+          : await db<{ bucket: string; total: string }>`
+              select to_char(date_trunc('week', t.date), 'YYYY-MM-DD') as bucket,
+                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+              from transactions t
+              where t.tier = 'purchase' and t.date >= ${startDate}
+              group by to_char(date_trunc('week', t.date), 'YYYY-MM-DD')
+            `
+        : categorySlug
+          ? await db<{ bucket: string; total: string }>`
+              select to_char(t.date, 'YYYY-MM-DD') as bucket,
+                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+              from transactions t
+              where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
+              group by to_char(t.date, 'YYYY-MM-DD')
+            `
+          : await db<{ bucket: string; total: string }>`
+              select to_char(t.date, 'YYYY-MM-DD') as bucket,
+                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+              from transactions t
+              where t.tier = 'purchase' and t.date >= ${startDate}
+              group by to_char(t.date, 'YYYY-MM-DD')
+            `;
+
+  const byBucket = new Map(rows.map((r) => [r.bucket, Math.abs(Number(r.total))]));
+  const result = buckets.map((b) => ({ bucket: b, total: byBucket.get(b) ?? 0 }));
+  return res.status(200).json(result);
+}
+
 function daysInMonth(year: number, month0: number): number {
   // month0 is 0-indexed; day 0 of the next month = last day of this month.
   return new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
@@ -180,11 +295,31 @@ async function monthSummary(res: VercelResponse) {
     ? priorSums.reduce((a, b) => a + b, 0) / priorSums.length
     : thisMonth;
 
-  const percentBelow = average > 0 ? Math.round((1 - thisMonth / average) * 100) : 0;
-  const fillPct = average > 0 ? Math.min(100, Math.max(0, (thisMonth / average) * 100)) : 0;
-  const avgLinePct = (dayOfMonth / daysInCurrentMonth) * 100;
+  // `average` is already scaled to "typical spend by today" (day-N of the
+  // prior 3 months) — projecting it out to a full month gives one shared
+  // denominator both the envelope bar and the actual-spend bar can be
+  // measured against, so the two are comparable and the "today" tick means
+  // something the bars themselves don't already show.
+  const projectedMonthTotal = average > 0 ? average * (daysInCurrentMonth / dayOfMonth) : 0;
+  const fillPct = projectedMonthTotal > 0 ? Math.min(100, Math.max(0, (thisMonth / projectedMonthTotal) * 100)) : 0;
+  const todayPct = (dayOfMonth / daysInCurrentMonth) * 100;
 
-  return res.status(200).json({ thisMonth, average, percentBelow, dayOfMonth, fillPct, avgLinePct });
+  // Pace label compares thisMonth to `average` (same day-of-month basis on
+  // both sides) — not to the projected total, which would conflate "spending
+  // fast" with "spending a lot on day 1."
+  const diffPct = average > 0 ? ((thisMonth - average) / average) * 100 : 0;
+  const paceLabel: "under" | "regular" | "over" = diffPct <= -10 ? "under" : diffPct >= 10 ? "over" : "regular";
+
+  return res.status(200).json({
+    thisMonth,
+    average,
+    projectedMonthTotal,
+    paceLabel,
+    dayOfMonth,
+    daysInMonth: daysInCurrentMonth,
+    fillPct,
+    todayPct,
+  });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -205,6 +340,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await drill(req, res);
       case "month":
         return await monthSummary(res);
+      case "trend":
+        return await trend(req, res);
       default:
         return res.status(404).json({ error: "Unknown summary metric." });
     }

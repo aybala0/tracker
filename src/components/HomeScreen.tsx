@@ -1,5 +1,5 @@
 import { useNetWorth } from "../hooks/useNetWorth";
-import { useMonthSummary } from "../hooks/useMonthSummary";
+import { useMonthSummary, type PaceLabel } from "../hooks/useMonthSummary";
 import { useCategoryTotals } from "../hooks/useCategoryTotals";
 import { PieChart } from "./PieChart";
 import { slices } from "../utils/pie";
@@ -15,6 +15,12 @@ type Props = {
 function fmtSigned(n: number): string {
   const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return n < 0 ? `−$${abs}` : `$${abs}`;
+}
+
+function fmtPace(label: PaceLabel): string {
+  if (label === "under") return "Under pace";
+  if (label === "over") return "Over pace";
+  return "Regular pace";
 }
 
 function fmtSyncedAgo(iso: string | null): string {
@@ -34,7 +40,7 @@ const TODAY_LABEL = new Date().toLocaleDateString("en-US", { weekday: "short", d
 
 export function HomeScreen({ inboxCount, onNavigate, lastSyncedAt }: Props) {
   const { net, checking, cards } = useNetWorth();
-  const { thisMonth, average, percentBelow, fillPct, avgLinePct, dayOfMonth } = useMonthSummary();
+  const { thisMonth, paceLabel, fillPct, todayPct, dayOfMonth, daysInMonth } = useMonthSummary();
   const totals = useCategoryTotals(CURRENT_MONTH_LABEL);
   const { out } = slices(totals, 92, 100, 100, null, false);
   const legend = out.slice(0, 5);
@@ -96,21 +102,18 @@ export function HomeScreen({ inboxCount, onNavigate, lastSyncedAt }: Props) {
           ${thisMonth.toLocaleString("en-US")}
         </div>
         <div className="pb-1" style={{ font: "600 12.5px/1.3 Archivo" }}>
-          <span style={{ background: "#78C247", padding: "2px 6px" }}>{percentBelow}% below</span>
-          <br />
-          <span style={{ color: "rgba(0,0,0,.55)", fontWeight: 500 }}>
-            day-{dayOfMonth} average of ${average.toLocaleString("en-US")}
-          </span>
+          {fmtPace(paceLabel)}
         </div>
       </div>
-      <div className="relative mb-[30px]" style={{ height: 14, border: "2px solid #000" }}>
+      <div className="relative mb-2" style={{ height: 14, border: "2px solid #000" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(120,194,71,.28)" }} />
         <div style={{ position: "absolute", inset: 0, right: `${100 - fillPct}%`, background: "#78C247" }} />
         <div
           style={{
             position: "absolute",
             top: -6,
             bottom: -6,
-            left: `${avgLinePct}%`,
+            left: `${todayPct}%`,
             width: 2,
             background: "#000",
           }}
@@ -120,15 +123,18 @@ export function HomeScreen({ inboxCount, onNavigate, lastSyncedAt }: Props) {
           style={{
             position: "absolute",
             top: -19,
-            left: `${avgLinePct}%`,
+            left: `${todayPct}%`,
             transform: "translateX(-50%)",
             font: "400 8.5px 'Space Mono', monospace",
             letterSpacing: ".1em",
             color: "rgba(0,0,0,.62)",
           }}
         >
-          avg
+          today
         </div>
+      </div>
+      <div className="mb-[30px] uppercase" style={{ font: "400 10px 'Space Mono', monospace", letterSpacing: ".08em", color: "rgba(0,0,0,.5)" }}>
+        Day {dayOfMonth} of {daysInMonth}
       </div>
 
       <div className="mb-3 flex items-center justify-between">
