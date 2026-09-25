@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 
 export type Granularity = "month" | "week" | "day";
 export type TrendPoint = { bucket: string; total: number };
-export type TrendSeries = { key: string; category: string | null; color: string };
+/** `subcategoryId` narrows the line to one subcategory; when set, `category` is left null (the id alone identifies it). */
+export type TrendSeries = { key: string; category: string | null; subcategoryId?: string; color: string };
 
 /**
  * Fetches one spend-over-time series per entry in `series` (one per active
@@ -18,7 +19,7 @@ export function useSpendTrends(
 ): { data: Record<string, TrendPoint[]>; loading: boolean } {
   const [data, setData] = useState<Record<string, TrendPoint[]>>({});
   const [loading, setLoading] = useState(false);
-  const seriesKey = series.map((s) => `${s.key}:${s.category ?? ""}`).join(",");
+  const seriesKey = series.map((s) => `${s.key}:${s.category ?? ""}:${s.subcategoryId ?? ""}`).join(",");
 
   useEffect(() => {
     if (series.length === 0) {
@@ -30,6 +31,7 @@ export function useSpendTrends(
       series.map((s) => {
         const qs = new URLSearchParams({ months: String(months), granularity });
         if (s.category) qs.set("category", s.category);
+        if (s.subcategoryId) qs.set("subcategory", s.subcategoryId);
         return fetch(`/api/summary/trend?${qs}`)
           .then((res) => res.json())
           .then((points: TrendPoint[]) => [s.key, points] as const);

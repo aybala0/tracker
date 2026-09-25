@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import type { Granularity, TrendPoint } from "../hooks/useSpendTrend";
 import { bucketLabel } from "../utils/format";
 
@@ -24,6 +24,10 @@ const DENSE_THRESHOLD = 30;
 /** Hand-rolled SVG multi-line chart for overlaying several month/week/day spend series, matching the app's flat brutalist chart style (straight segments, bordered markers, no curve smoothing). */
 export function LineChart({ series, granularity, width = 320, height = 180, onHoverIndex }: Props) {
   const [hover, setHover] = useState<number | null>(null);
+  // The in-progress press: whether it started on the already-highlighted
+  // point and whether it has scrubbed off it since. A press that neither
+  // moves nor lands elsewhere is a tap on the active point, which clears it.
+  const press = useRef<{ startedOnActive: boolean; moved: boolean } | null>(null);
 
   const points = series[0]?.points ?? [];
   if (points.length === 0) {
@@ -46,11 +50,65 @@ export function LineChart({ series, granularity, width = 320, height = 180, onHo
     onHoverIndex?.(i);
   };
 
+  // Nearest point to the pointer's x, found from the position rather than
+  // from per-point hit targets — those end up 1–2px wide on a phone once a
+  // range has ~180 daily points, too thin to tap. getScreenCTM maps screen
+  // pixels back into viewBox units, whatever scaling the svg is drawn at.
+  const indexAt = (e: PointerEvent<SVGSVGElement>): number => {
+    const ctm = e.currentTarget.getScreenCTM();
+    if (!ctm || step === 0) return 0;
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    return Math.min(points.length - 1, Math.max(0, Math.round((pt.x - PAD_X) / step)));
+  };
+
+  const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
+    const i = indexAt(e);
+    press.current = { startedOnActive: i === hover, moved: false };
+    // Keep receiving moves while a finger scrubs, even if it slides off the chart.
+    e.currentTarget.setPointerCapture(e.pointerId);
+    select(i);
+  };
+
+  const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
+    // A mouse highlights on hover alone; a finger or pen only while pressed.
+    if (e.pointerType !== "mouse" && !press.current) return;
+    const i = indexAt(e);
+    if (i === hover) return;
+    if (press.current) press.current.moved = true;
+    select(i);
+  };
+
+  const onPointerUp = () => {
+    if (press.current?.startedOnActive && !press.current.moved) select(null);
+    press.current = null;
+  };
+
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      style={{ width: "100%", height, display: "block" }}
-      onMouseLeave={() => select(null)}
+      style={{
+        width: "100%",
+        height,
+        display: "block",
+        cursor: "pointer",
+        // Horizontal drags scrub the chart; vertical drags still scroll the
+        // page. This also disables double-tap zoom on the chart.
+        touchAction: "pan-y",
+        // No text selection, long-press callout, or tap flash from the axis labels.
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      // Fired when the browser takes over the gesture, e.g. a vertical scroll.
+      // The highlighted point stays, same as lifting the finger.
+      onPointerCancel={() => (press.current = null)}
+      // Only a mouse clears on leave; on a phone the last touched point stays
+      // shown after the finger lifts, so its values can be read.
+      onPointerLeave={(e) => e.pointerType === "mouse" && !press.current && select(null)}
     >
       <line x1={PAD_X} y1={PAD_TOP + plotH} x2={width - PAD_X} y2={PAD_TOP + plotH} stroke="rgba(0,0,0,.18)" strokeWidth={1.5} />
 
@@ -62,20 +120,6 @@ export function LineChart({ series, granularity, width = 320, height = 180, onHo
         const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(2)} ${yAt(p.total).toFixed(2)}`).join(" ");
         return <path key={s.key} d={d} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />;
       })}
-
-      {points.map((p, i) => (
-        <rect
-          key={p.bucket}
-          x={xAt(i) - step / 2}
-          y={0}
-          width={step || plotW}
-          height={height}
-          fill="transparent"
-          onMouseEnter={() => select(i)}
-          onClick={() => select(hover === i ? null : i)}
-          style={{ cursor: "pointer" }}
-        />
-      ))}
 
       {series.map((s) =>
         s.points.map((p, i) => {

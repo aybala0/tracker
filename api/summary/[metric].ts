@@ -160,9 +160,10 @@ function bucketList(months: number, granularity: Granularity): string[] {
 }
 
 async function trend(req: VercelRequest, res: VercelResponse) {
-  const { months, category, granularity: rawGranularity } = req.query as {
+  const { months, category, subcategory, granularity: rawGranularity } = req.query as {
     months?: string;
     category?: string;
+    subcategory?: string;
     granularity?: string;
   };
   const count = Math.min(24, Math.max(1, Number(months) || 6));
@@ -177,57 +178,31 @@ async function trend(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // A subcategory id already pins down its major, so it's filtered on alone —
+  // this is what lets the Analysis tab chart a subcategory without its parent.
+  let subcategoryId: string | null = null;
+  if (subcategory) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subcategory)) {
+      return res.status(400).json({ error: `Invalid subcategory id: ${subcategory}` });
+    }
+    subcategoryId = subcategory;
+  }
+
   const buckets = bucketList(count, granularity);
   const startDate = granularity === "month" ? `${buckets[0]}-01` : buckets[0];
+  // Bucket keys must match bucketList's format: YYYY-MM for months, the
+  // Monday's YYYY-MM-DD for weeks, the day itself for days.
+  const bucketFormat = granularity === "month" ? "YYYY-MM" : "YYYY-MM-DD";
 
-  const rows =
-    granularity === "month"
-      ? categorySlug
-        ? await db<{ bucket: string; total: string }>`
-            select to_char(t.date, 'YYYY-MM') as bucket,
-              sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-            from transactions t
-            where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
-            group by to_char(t.date, 'YYYY-MM')
-          `
-        : await db<{ bucket: string; total: string }>`
-            select to_char(t.date, 'YYYY-MM') as bucket,
-              sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-            from transactions t
-            where t.tier = 'purchase' and t.date >= ${startDate}
-            group by to_char(t.date, 'YYYY-MM')
-          `
-      : granularity === "week"
-        ? categorySlug
-          ? await db<{ bucket: string; total: string }>`
-              select to_char(date_trunc('week', t.date), 'YYYY-MM-DD') as bucket,
-                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-              from transactions t
-              where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
-              group by to_char(date_trunc('week', t.date), 'YYYY-MM-DD')
-            `
-          : await db<{ bucket: string; total: string }>`
-              select to_char(date_trunc('week', t.date), 'YYYY-MM-DD') as bucket,
-                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-              from transactions t
-              where t.tier = 'purchase' and t.date >= ${startDate}
-              group by to_char(date_trunc('week', t.date), 'YYYY-MM-DD')
-            `
-        : categorySlug
-          ? await db<{ bucket: string; total: string }>`
-              select to_char(t.date, 'YYYY-MM-DD') as bucket,
-                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-              from transactions t
-              where t.tier = 'purchase' and t.date >= ${startDate} and t.category_slug = ${categorySlug}
-              group by to_char(t.date, 'YYYY-MM-DD')
-            `
-          : await db<{ bucket: string; total: string }>`
-              select to_char(t.date, 'YYYY-MM-DD') as bucket,
-                sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
-              from transactions t
-              where t.tier = 'purchase' and t.date >= ${startDate}
-              group by to_char(t.date, 'YYYY-MM-DD')
-            `;
+  const rows = await db<{ bucket: string; total: string }>`
+    select to_char(date_trunc(${granularity}, t.date), ${bucketFormat}) as bucket,
+      sum(case when t.is_shared then coalesce(t.shared_amount, t.amount) else t.amount end) as total
+    from transactions t
+    where t.tier = 'purchase' and t.date >= ${startDate}
+      and (${categorySlug}::text is null or t.category_slug = ${categorySlug})
+      and (${subcategoryId}::uuid is null or t.subcategory_id = ${subcategoryId}::uuid)
+    group by 1
+  `;
 
   const byBucket = new Map(rows.map((r) => [r.bucket, Math.abs(Number(r.total))]));
   const result = buckets.map((b) => ({ bucket: b, total: byBucket.get(b) ?? 0 }));
