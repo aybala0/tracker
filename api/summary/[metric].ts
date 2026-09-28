@@ -233,7 +233,7 @@ async function monthSummary(res: VercelResponse) {
   const todayStr = dateStr(year, month0, dayOfMonth);
 
   const [thisMonthRow] = await db<{ total: string | null }>`
-    select sum(amount) as total
+    select sum(case when is_shared then coalesce(shared_amount, amount) else amount end) as total
     from transactions
     where tier = 'purchase' and date >= ${monthStart} and date <= ${todayStr}
   `;
@@ -256,7 +256,7 @@ async function monthSummary(res: VercelResponse) {
     const end = dateStr(targetYear, targetMonth0, equivalentDay);
 
     const [row] = await db<{ total: string | null; cnt: string }>`
-      select sum(amount) as total, count(*) as cnt
+      select sum(case when is_shared then coalesce(shared_amount, amount) else amount end) as total, count(*) as cnt
       from transactions
       where tier = 'purchase' and date >= ${start} and date <= ${end}
     `;

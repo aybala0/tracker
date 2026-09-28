@@ -28,6 +28,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       from transactions t
       left join regex_rules r on r.id = t.matched_rule_id
       where t.tier is null
+        -- Only final transactions are shown for labelling: a pending one can
+        -- still change amount (tips, holds) or be cancelled, which matters
+        -- once it's been shared to the Hayat sheet. Pending rows are still
+        -- stored, so plaid-sync can move them onto their posted version.
+        and coalesce(t.raw->>'pending', 'false') = 'false'
       order by t.date asc
     `;
 
