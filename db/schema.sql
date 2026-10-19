@@ -127,3 +127,16 @@ drop table if exists categories;
 alter table transactions drop constraint if exists transactions_tier_check;
 alter table transactions add constraint transactions_tier_check
   check (tier in ('income', 'purchase', 'investment', 'transfer'));
+
+-- User-defined major categories, created from the inbox's "Other → define a
+-- category" sheet. They sit alongside the ten code-constant majors in
+-- lib/category-defs.ts and share the same text-slug model (transactions and
+-- regex_rules reference them via category_slug). No color column: the
+-- frontend derives each one's color from its creation order
+-- (src/utils/category-color.ts nextMajorColor), same as the built-in colors
+-- living only on the frontend.
+create table if not exists custom_categories (
+  slug text primary key,
+  name text not null unique,
+  created_at timestamptz not null default now()
+);

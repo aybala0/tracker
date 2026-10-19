@@ -49,7 +49,7 @@ async function markSynced(row: HayatRow): Promise<void> {
  */
 async function createSyntheticTransaction(row: HayatRow): Promise<void> {
   const categoryName = stripTagEmoji(row.tag);
-  const categorySlug = resolveMajorSlug(categoryName);
+  const categorySlug = await resolveMajorSlug(categoryName);
   if (!categorySlug) {
     throw new Error(`Could not resolve category for tag "${row.tag}"`);
   }

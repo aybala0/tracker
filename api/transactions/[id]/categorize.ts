@@ -88,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, ruleCreated: true, siblingsFlagged: tierSiblingRows.length });
     }
 
-    const majorSlug = resolveMajorSlug(cat!);
+    const majorSlug = await resolveMajorSlug(cat!);
     if (!majorSlug) {
       return res.status(400).json({ error: `Unknown category: ${cat}` });
     }

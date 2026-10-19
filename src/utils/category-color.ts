@@ -1,4 +1,5 @@
 import { MAJOR_CATEGORIES } from "../constants/categories";
+import { getMajors } from "../hooks/useMajors";
 
 const FALLBACK_COLOR = "#111111"; // Other's color, used as a last-resort fallback.
 
@@ -60,9 +61,18 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`.toUpperCase();
 }
 
-/** Looks up a major category's fixed color by exact name match. */
+/**
+ * Looks up a major category's color by exact name match: the fixed color for
+ * a built-in, or a generated one for a custom major based on its position
+ * among the custom majors (creation order, so it's stable).
+ */
 export function colorForCategory(name: string): string {
-  return MAJOR_CATEGORIES.find((c) => c.name === name)?.color ?? FALLBACK_COLOR;
+  const builtIn = MAJOR_CATEGORIES.find((c) => c.name === name);
+  if (builtIn) return builtIn.color;
+  const customIndex = getMajors()
+    .filter((c) => c.custom)
+    .findIndex((c) => c.name === name);
+  return customIndex >= 0 ? nextMajorColor(customIndex) : FALLBACK_COLOR;
 }
 
 /**
@@ -83,10 +93,9 @@ export function colorForSubcategory(parentName: string, siblingIndex: number): s
 }
 
 /**
- * Golden-angle HSL generator for the color a NEW major category (beyond the
- * fixed 10) would get, if a user ever creates one via the "Other → define a
- * new major category" flow. Forward-looking infrastructure only — that flow
- * is still intentionally inert; nothing calls this yet.
+ * Golden-angle HSL generator for a user-defined major category's color
+ * (beyond the fixed 10), created via the "Other → define a category" sheet.
+ * Takes the major's index among the custom majors (0 for the first).
  */
 export function nextMajorColor(existingCustomMajorCount: number): string {
   const hue = (137.508 * (existingCustomMajorCount + 1)) % 360;

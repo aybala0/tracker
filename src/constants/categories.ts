@@ -1,5 +1,6 @@
 /**
- * The 10 default major categories: slug (machine id, matches
+ * The 10 default major categories (user-defined ones come from the API —
+ * see src/hooks/useMajors.ts): slug (machine id, matches
  * lib/category-defs.ts on the backend), display name, and fixed color. Color
  * is a frontend-only presentation concern — see src/utils/category-color.ts
  * for how it's looked up/derived at render time. Keep colors verbatim —
@@ -18,9 +19,6 @@ export const MAJOR_CATEGORIES: { slug: string; name: string; color: string }[] =
   { slug: "travel", name: "Travel", color: "#0E7C9B" },
   { slug: "other", name: "Other", color: "#111111" },
 ];
-
-/** Display names in fixed order, derived from MAJOR_CATEGORIES — kept as a small export since several components just need the name list. */
-export const CATS = MAJOR_CATEGORIES.map((c) => c.name);
 
 /**
  * Current month first, going back `count` months — computed from today's

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { db } from "../../lib/db.js";
 import { requireAuth } from "../../lib/auth.js";
 import { getSubcategoryInfo } from "../../lib/categories.js";
-import { getMajorName } from "../../lib/category-defs.js";
+import { loadMajors } from "../../lib/category-defs.js";
 import { fmtDayMonth } from "../../lib/format-date.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -36,13 +36,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       order by t.date asc
     `;
 
+    const majors = await loadMajors();
     const result = await Promise.all(
       rows.map(async (row) => {
         let cat: string | undefined;
         let sub: string | undefined;
         let ruleTier: "Income" | "Investment" | undefined;
         if (row.matched_rule_id && row.rule_tier === "purchase" && row.rule_category_slug) {
-          cat = getMajorName(row.rule_category_slug) ?? undefined;
+          cat = majors.find((m) => m.slug === row.rule_category_slug)?.name;
           if (row.rule_subcategory_id) {
             const subInfo = await getSubcategoryInfo(row.rule_subcategory_id);
             sub = subInfo?.name;

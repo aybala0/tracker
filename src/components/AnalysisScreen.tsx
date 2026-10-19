@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSpendTrends, type Granularity, type TrendSeries } from "../hooks/useSpendTrend";
-import { MAJOR_CATEGORIES } from "../constants/categories";
+import { useMajors } from "../hooks/useMajors";
 import { short, bucketLabel } from "../utils/format";
 import { LineChart, type ChartSeries } from "./LineChart";
 import { CategoryChip } from "./CategoryChip";
@@ -13,7 +13,7 @@ const GRANULARITIES: { key: Granularity; label: string }[] = [
   { key: "day", label: "D" },
 ];
 const ALL_KEY = "All";
-// Neutral gray, deliberately outside the 10 fixed category hues (src/constants/categories.ts)
+// Neutral gray, deliberately outside the fixed category hues (src/constants/categories.ts)
 // so the aggregate "All" line never reads as one more category when stacked alongside them.
 const ALL_COLOR = "#5C5C5C";
 // Subcategory selections are keyed by id, not name — names only have to be
@@ -40,6 +40,7 @@ export function AnalysisScreen() {
   const [range, setRange] = useState<(typeof MONTH_RANGES)[number]>(6);
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const allMajors = useMajors();
   const [majors, setMajors] = useState<Major[]>([]);
   // The major whose subcategory chips are showing below the category grid.
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -74,8 +75,8 @@ export function AnalysisScreen() {
 
   const seriesDefs: SeriesDef[] = [];
   if (selected.has(ALL_KEY)) seriesDefs.push({ key: ALL_KEY, label: "All spending", category: null, color: ALL_COLOR });
-  for (const c of MAJOR_CATEGORIES) {
-    if (selected.has(c.name)) seriesDefs.push({ key: c.name, label: c.name, category: c.name, color: c.color });
+  for (const c of allMajors) {
+    if (selected.has(c.name)) seriesDefs.push({ key: c.name, label: c.name, category: c.name, color: colorForCategory(c.name) });
     subsOf(c.name).forEach((sub, i) => {
       if (!selected.has(subKey(sub.id))) return;
       seriesDefs.push({
@@ -160,14 +161,14 @@ export function AnalysisScreen() {
       </div>
       <div className={`${expanded ? "mb-3" : "mb-[22px]"} flex flex-wrap gap-1.5`}>
         <CategoryChip name={ALL_KEY} color={ALL_COLOR} active={selected.has(ALL_KEY)} onClick={() => toggle(ALL_KEY)} size="sm" />
-        {MAJOR_CATEGORIES.map((c) => {
+        {allMajors.map((c) => {
           const subs = subsOf(c.name);
           const subCount = subs.filter((sub) => selected.has(subKey(sub.id))).length;
           return (
             <CategoryChip
               key={c.slug}
               name={subs.length > 0 ? `${c.name} ${expanded === c.name ? "▴" : "▾"}${subCount > 0 ? ` · ${subCount}` : ""}` : c.name}
-              color={c.color}
+              color={colorForCategory(c.name)}
               active={selected.has(c.name)}
               onClick={() => onMajorClick(c.name)}
               size="sm"

@@ -85,9 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let categoryName = "Other";
     if (txn.subcategory_id) {
       const subInfo = await getSubcategoryInfo(txn.subcategory_id);
-      if (subInfo) categoryName = getMajorName(subInfo.parentSlug) ?? categoryName;
+      if (subInfo) categoryName = (await getMajorName(subInfo.parentSlug)) ?? categoryName;
     } else if (txn.category_slug) {
-      categoryName = getMajorName(txn.category_slug) ?? categoryName;
+      categoryName = (await getMajorName(txn.category_slug)) ?? categoryName;
     }
     const tag = categoryNameToTag(categoryName);
 

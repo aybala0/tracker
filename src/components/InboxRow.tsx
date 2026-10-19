@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Tier, Transaction } from "../types";
-import { CATS } from "../constants/categories";
+import type { DefineCategoryKind, Tier, Transaction } from "../types";
+import { createMajor, useMajors } from "../hooks/useMajors";
 import { colorForCategory, colorForSubcategory } from "../utils/category-color";
 import { fg } from "../utils/color";
 import { moneySigned } from "../utils/format";
@@ -36,6 +36,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const [newSubName, setNewSubName] = useState("");
   const [ruleOpen, setRuleOpen] = useState(false);
   const [ruleContains, setRuleContains] = useState("");
+  const majors = useMajors();
 
   // Reset local labeling state whenever the row opens or closes. Purchase is
   // the default tier — it's the overwhelmingly common case for a bank feed.
@@ -95,6 +96,19 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
 
   const finish = () => onCategorize(cat!, sub, ruleOpen ? ruleContains.trim() || undefined : undefined);
   const finishShared = () => onShare(cat!, sub, hayatDesc, ruleOpen ? ruleContains.trim() || undefined : undefined);
+  // "Other → define a category": a minor is a subcategory under Other (the
+  // categorize endpoint creates it on the fly); a major is created first so
+  // the categorize endpoint recognizes its name. Either way the transaction
+  // is labeled right away.
+  const createFromOther = async (kind: DefineCategoryKind, name: string) => {
+    if (kind === "major") {
+      const major = await createMajor(name);
+      onCategorize(major.name, null);
+    } else {
+      onCategorize("Other", name);
+    }
+    setOtherOpen(false);
+  };
   const finishTierOnly = () =>
     onFinishTier(tier as "Income" | "Investment", ruleOpen ? ruleContains.trim() || undefined : undefined);
 
@@ -215,7 +229,7 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                 Category
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {CATS.map((n) => (
+                {majors.map(({ name: n }) => (
                   <CategoryChip
                     key={n}
                     name={n}
@@ -416,7 +430,9 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
         </div>
       )}
 
-      {otherOpen && <OtherCategorySheet desc={tx.desc} onClose={() => setOtherOpen(false)} />}
+      {otherOpen && (
+        <OtherCategorySheet desc={tx.desc} onClose={() => setOtherOpen(false)} onCreate={createFromOther} />
+      )}
     </div>
   );
 }

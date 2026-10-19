@@ -4,11 +4,27 @@ import type { DefineCategoryKind } from "../types";
 type Props = {
   desc: string;
   onClose: () => void;
+  /** Defines the category and labels the transaction with it. Rejects with a user-facing message on failure. */
+  onCreate: (kind: DefineCategoryKind, name: string) => Promise<void>;
 };
 
 /** Bottom sheet asking whether "Other" should become a new major or minor category. */
-export function OtherCategorySheet({ desc, onClose }: Props) {
+export function OtherCategorySheet({ desc, onClose, onCreate }: Props) {
   const [defKind, setDefKind] = useState<DefineCategoryKind | null>(null);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canCreate = !!defKind && !!name.trim() && !saving;
+  const create = () => {
+    if (!canCreate) return;
+    setSaving(true);
+    setError(null);
+    onCreate(defKind, name.trim()).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to create category.");
+      setSaving(false);
+    });
+  };
 
   return (
     <div
@@ -48,10 +64,19 @@ export function OtherCategorySheet({ desc, onClose }: Props) {
             <div style={{ font: "500 12px Archivo", color: "rgba(0,0,0,.65)" }}>A subcategory under Other</div>
           </div>
           <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                create();
+              }
+            }}
             placeholder="Name it — e.g. Theatre"
             className="mt-0.5 w-full"
             style={{ height: 46, border: "2px solid #000", padding: "0 12px", font: "600 14px Archivo" }}
           />
+          {error && <div style={{ font: "600 12px Archivo", color: "#F2188F" }}>{error}</div>}
           <div className="mt-1 flex gap-2.5">
             <button
               type="button"
@@ -63,11 +88,12 @@ export function OtherCategorySheet({ desc, onClose }: Props) {
             </button>
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 grid place-items-center uppercase"
+              onClick={create}
+              disabled={!canCreate}
+              className="flex-1 grid place-items-center uppercase disabled:opacity-40"
               style={{ height: 46, background: "#F2188F", color: "#fff", font: "800 12px Archivo", letterSpacing: ".06em" }}
             >
-              Create
+              {saving ? "Creating…" : "Create"}
             </button>
           </div>
         </div>

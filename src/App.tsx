@@ -3,6 +3,7 @@ import type { NavTarget } from "./types";
 import { useAuth } from "./hooks/useAuth";
 import { useTransactions } from "./hooks/useTransactions";
 import { useBankStatus } from "./hooks/useBankStatus";
+import { useMajors } from "./hooks/useMajors";
 import { LoginScreen } from "./components/LoginScreen";
 import { ConnectBank } from "./components/ConnectBank";
 import { BottomNav } from "./components/BottomNav";
@@ -16,6 +17,10 @@ export default function App() {
   const [tab, setTab] = useState<NavTarget>("Home");
   const { linked, lastSyncedAt, institutions, refresh } = useBankStatus();
   const { inbox, categorize, share, categorizeTier } = useTransactions();
+  // Loads custom majors once at startup. Subscribing here means the whole
+  // tree re-renders when they arrive, so colorForCategory (pie slices,
+  // chips) picks up their colors everywhere, not just in list components.
+  useMajors();
 
   if (authenticated === null) {
     return <div className="min-h-screen bg-white" />;

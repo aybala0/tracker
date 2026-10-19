@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DrillItem } from "../types";
-import { CATS } from "../constants/categories";
+import { useMajors } from "../hooks/useMajors";
 import { colorForSubcategory } from "../utils/category-color";
 import { fg } from "../utils/color";
 import { money } from "../utils/format";
@@ -32,6 +32,7 @@ export function DrillRow({ item, tagBg, tagFg, currentCategory, onSave }: Props)
   const [hayatDesc, setHayatDesc] = useState("");
   const [ruleOpen, setRuleOpen] = useState(false);
   const [ruleContains, setRuleContains] = useState("");
+  const majors = useMajors();
 
   // Reset the editor to the row's current real values whenever it opens or
   // closes, so a cancelled edit never leaks into the next time it's opened.
@@ -146,7 +147,7 @@ export function DrillRow({ item, tagBg, tagFg, currentCategory, onSave }: Props)
             Category
           </div>
           <div className="mb-[18px] flex flex-wrap gap-1.5">
-            {CATS.map((n) => (
+            {majors.map(({ name: n }) => (
               <CategoryChip
                 key={n}
                 name={n}

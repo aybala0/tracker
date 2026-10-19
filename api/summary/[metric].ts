@@ -3,7 +3,7 @@ import { db } from "../../lib/db.js";
 import { requireAuth } from "../../lib/auth.js";
 import { getRows } from "../../lib/sheets.js";
 import { fmtDayMonth } from "../../lib/format-date.js";
-import { getMajorName, resolveMajorSlug } from "../../lib/category-defs.js";
+import { loadMajors, resolveMajorSlug } from "../../lib/category-defs.js";
 
 // Consolidated into one dynamic route ([metric].ts handles net-worth,
 // categories, month, drill) to stay under Vercel Hobby's 12-Serverless-
@@ -64,9 +64,10 @@ async function categoriesSummary(req: VercelRequest, res: VercelResponse) {
     group by t.category_slug
   `;
 
+  const majors = await loadMajors();
   const result: Record<string, number> = {};
   for (const r of rows) {
-    const name = getMajorName(r.category_slug);
+    const name = majors.find((m) => m.slug === r.category_slug)?.name;
     if (!name) continue; // unknown slug — shouldn't happen, skip defensively
     result[name] = Math.abs(Number(r.total));
   }
@@ -79,7 +80,7 @@ async function drill(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "month (YYYY-MM) and category are required." });
   }
 
-  const categorySlug = resolveMajorSlug(category);
+  const categorySlug = await resolveMajorSlug(category);
   if (!categorySlug) {
     return res.status(400).json({ error: `Unknown category: ${category}` });
   }
@@ -110,7 +111,7 @@ async function drill(req: VercelRequest, res: VercelResponse) {
   const result = rows.map((r) => ({
     id: r.id,
     desc: r.description,
-    tag: r.sub_name ?? getMajorName(r.category_slug) ?? r.category_slug,
+    tag: r.sub_name ?? category,
     amt: Math.abs(Number(r.amount)),
     date: fmtDayMonth(r.date),
     shared: r.is_shared,
@@ -172,7 +173,7 @@ async function trend(req: VercelRequest, res: VercelResponse) {
 
   let categorySlug: string | null = null;
   if (category) {
-    categorySlug = resolveMajorSlug(category);
+    categorySlug = await resolveMajorSlug(category);
     if (!categorySlug) {
       return res.status(400).json({ error: `Unknown category: ${category}` });
     }
