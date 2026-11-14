@@ -11,9 +11,10 @@ type Props = {
   tx: Transaction;
   open: boolean;
   onToggle: () => void;
-  onCategorize: (cat: string, sub: string | null, ruleContains?: string) => void;
-  onShare: (cat: string, sub: string | null, description: string, ruleContains?: string) => void;
-  onFinishTier: (tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
+  /** `rename` is set only when the user edited the description — applied to this one transaction. */
+  onCategorize: (cat: string, sub: string | null, ruleContains?: string, rename?: string) => void;
+  onShare: (cat: string, sub: string | null, description: string, ruleContains?: string, rename?: string) => void;
+  onFinishTier: (tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string, rename?: string) => void;
   /** True for rows in the "already matched" section — starts the editor pre-filled with the rule's suggestion and shows a suggestion chip + "Edit" instead of "Label" when closed. */
   matched?: boolean;
 };
@@ -30,6 +31,10 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const [sub, setSub] = useState<string | null>(null);
   const [hayat, setHayat] = useState(false);
   const [hayatDesc, setHayatDesc] = useState("");
+  // Once the user types in the Hayat box directly, stop mirroring the
+  // edited transaction description into it.
+  const [hayatDescTouched, setHayatDescTouched] = useState(false);
+  const [desc, setDesc] = useState(tx.desc);
   const [otherOpen, setOtherOpen] = useState(false);
   const [subOptions, setSubOptions] = useState<string[]>([]);
   const [addingSub, setAddingSub] = useState(false);
@@ -50,13 +55,26 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
       setSub(matched ? tx.sub ?? null : null);
       setHayat(false);
       setHayatDesc("");
+      setHayatDescTouched(false);
+      setDesc(tx.desc);
       setOtherOpen(false);
       setAddingSub(false);
       setNewSubName("");
       setRuleOpen(false);
       setRuleContains("");
     }
-  }, [open, matched, tx.cat, tx.sub, tx.ruleTier]);
+  }, [open, matched, tx.cat, tx.sub, tx.ruleTier, tx.desc]);
+
+  // Only send a rename when the description actually changed.
+  const rename = desc.trim() && desc.trim() !== tx.desc ? desc.trim() : undefined;
+
+  const onDescChange = (value: string) => {
+    setDesc(value);
+    if (!hayatDescTouched) {
+      const trimmed = value.trim();
+      setHayatDesc(trimmed && trimmed !== tx.desc ? value : "");
+    }
+  };
 
   // Real subcategory suggestions for the selected major, fetched from the
   // API's live data instead of the old SUBS mock. GET /api/categories
@@ -94,8 +112,9 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const showSubs = !!cat && cat !== "Other";
   const showShared = !!cat;
 
-  const finish = () => onCategorize(cat!, sub, ruleOpen ? ruleContains.trim() || undefined : undefined);
-  const finishShared = () => onShare(cat!, sub, hayatDesc, ruleOpen ? ruleContains.trim() || undefined : undefined);
+  const finish = () => onCategorize(cat!, sub, ruleOpen ? ruleContains.trim() || undefined : undefined, rename);
+  const finishShared = () =>
+    onShare(cat!, sub, hayatDesc.trim(), ruleOpen ? ruleContains.trim() || undefined : undefined, rename);
   // "Other → define a category": a minor is a subcategory under Other (the
   // categorize endpoint creates it on the fly); a major is created first so
   // the categorize endpoint recognizes its name. Either way the transaction
@@ -103,14 +122,14 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
   const createFromOther = async (kind: DefineCategoryKind, name: string) => {
     if (kind === "major") {
       const major = await createMajor(name);
-      onCategorize(major.name, null);
+      onCategorize(major.name, null, undefined, rename);
     } else {
-      onCategorize("Other", name);
+      onCategorize("Other", name, undefined, rename);
     }
     setOtherOpen(false);
   };
   const finishTierOnly = () =>
-    onFinishTier(tier as "Income" | "Investment", ruleOpen ? ruleContains.trim() || undefined : undefined);
+    onFinishTier(tier as "Income" | "Investment", ruleOpen ? ruleContains.trim() || undefined : undefined, rename);
 
   return (
     <div className="relative" style={{ borderTop: "2px solid #000", padding: "14px 0" }}>
@@ -122,7 +141,23 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
           >
             {tx.date}
           </div>
-          <div style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em" }}>{tx.desc}</div>
+          {open ? (
+            <div className="flex items-center gap-1.5" style={{ borderBottom: "1.5px dashed rgba(0,0,0,.35)" }}>
+              <input
+                value={desc}
+                onChange={(e) => onDescChange(e.target.value)}
+                onBlur={() => {
+                  if (!desc.trim()) onDescChange(tx.desc);
+                }}
+                aria-label="Description"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+                style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em", padding: "2px 0" }}
+              />
+              <i className="ph-bold ph-pencil-simple flex-none" style={{ fontSize: 13, color: "rgba(0,0,0,.45)" }} />
+            </div>
+          ) : (
+            <div style={{ font: "700 15px/1.25 Archivo", letterSpacing: "-.01em" }}>{tx.desc}</div>
+          )}
           {matched && !open && (tx.cat || tx.ruleTier) && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {tx.cat ? (
@@ -390,7 +425,10 @@ export function InboxRow({ tx, open, onToggle, onCategorize, onShare, onFinishTi
                   <input
                     autoFocus
                     value={hayatDesc}
-                    onChange={(e) => setHayatDesc(e.target.value)}
+                    onChange={(e) => {
+                      setHayatDesc(e.target.value);
+                      setHayatDescTouched(true);
+                    }}
                     placeholder="e.g. TJ run"
                     className="mb-3.5 w-full"
                     style={{ height: 42, border: "1.5px solid rgba(0,0,0,.3)", background: "#fff", padding: "0 10px", font: "500 14px Archivo" }}

@@ -4,9 +4,9 @@ import { InboxRow } from "./InboxRow";
 
 type Props = {
   inbox: Transaction[];
-  onCategorize: (id: string, cat: string, sub: string | null, ruleContains?: string) => void;
-  onShare: (id: string, cat: string, sub: string | null, description: string, ruleContains?: string) => void;
-  onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => void;
+  onCategorize: (id: string, cat: string, sub: string | null, ruleContains?: string, rename?: string) => void;
+  onShare: (id: string, cat: string, sub: string | null, description: string, ruleContains?: string, rename?: string) => void;
+  onFinishTier: (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string, rename?: string) => void;
 };
 
 export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Props) {
@@ -38,16 +38,16 @@ export function InboxScreen({ inbox, onCategorize, onShare, onFinishTier }: Prop
       matched={matchedRow}
       open={openId === t.id}
       onToggle={() => setOpenId(openId === t.id ? null : t.id)}
-      onCategorize={(cat, sub, ruleContains) => {
-        onCategorize(t.id, cat, sub, ruleContains);
+      onCategorize={(cat, sub, ruleContains, rename) => {
+        onCategorize(t.id, cat, sub, ruleContains, rename);
         setOpenId(null);
       }}
-      onShare={(cat, sub, description, ruleContains) => {
-        onShare(t.id, cat, sub, description, ruleContains);
+      onShare={(cat, sub, description, ruleContains, rename) => {
+        onShare(t.id, cat, sub, description, ruleContains, rename);
         setOpenId(null);
       }}
-      onFinishTier={(tier, ruleContains) => {
-        onFinishTier(t.id, tier, ruleContains);
+      onFinishTier={(tier, ruleContains, rename) => {
+        onFinishTier(t.id, tier, ruleContains, rename);
         setOpenId(null);
       }}
     />

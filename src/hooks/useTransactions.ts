@@ -32,12 +32,12 @@ export function useTransactions() {
   // optimistically; a refetch afterward picks up any siblings' new
   // suggestion.
   const categorize = useCallback(
-    (id: string, cat: string, sub: string | null, ruleContains?: string) => {
+    (id: string, cat: string, sub: string | null, ruleContains?: string, rename?: string) => {
       setInbox((prev) => prev.filter((t) => t.id !== id));
       fetch(`/api/transactions/${id}/categorize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cat, sub, isShared: false, ruleContains }),
+        body: JSON.stringify({ cat, sub, isShared: false, ruleContains, description: rename }),
       })
         .then(fetchInbox)
         .catch(() => {
@@ -61,12 +61,12 @@ export function useTransactions() {
    * (non-shared) suggestion.
    */
   const share = useCallback(
-    (id: string, cat: string, sub: string | null, description: string, ruleContains?: string) => {
+    (id: string, cat: string, sub: string | null, description: string, ruleContains?: string, rename?: string) => {
       setInbox((prev) => prev.filter((t) => t.id !== id));
       fetch(`/api/transactions/${id}/categorize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cat, sub, isShared: true, ruleContains }),
+        body: JSON.stringify({ cat, sub, isShared: true, ruleContains, description: rename }),
       })
         .then(() =>
           fetch(`/api/hayat/share`, {
@@ -92,12 +92,12 @@ export function useTransactions() {
    * review rather than silently re-tiered.
    */
   const categorizeTier = useCallback(
-    (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string) => {
+    (id: string, tier: Extract<Tier, "Income" | "Investment">, ruleContains?: string, rename?: string) => {
       setInbox((prev) => prev.filter((t) => t.id !== id));
       fetch(`/api/transactions/${id}/categorize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: tier.toLowerCase(), ruleContains }),
+        body: JSON.stringify({ tier: tier.toLowerCase(), ruleContains, description: rename }),
       })
         .then(fetchInbox)
         .catch(() => {
